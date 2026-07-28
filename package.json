@@ -1,0 +1,22 @@
+{
+  "name": "laundry-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise Laundry Management System - Monorepo",
+  "scripts": {
+    "api:dev": "pnpm --filter @laundry/api dev",
+    "api:build": "pnpm --filter @laundry/api build",
+    "api:start": "pnpm --filter @laundry/api start",
+    "db:generate": "pnpm --filter @laundry/api db:generate",
+    "db:migrate": "pnpm --filter @laundry/api db:migrate",
+    "db:push": "pnpm --filter @laundry/api db:push",
+    "db:studio": "pnpm --filter @laundry/api db:studio",
+    "admin:dev": "pnpm --filter @laundry/admin dev",
+    "admin:build": "pnpm --filter @laundry/admin build",
+    "admin:start": "pnpm --filter @laundry/admin start"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.12.0"
+}

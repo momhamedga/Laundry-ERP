@@ -1,0 +1,1754 @@
+// ======================================
+// Laundry ERP - Database Schema
+// PostgreSQL (Neon) + Prisma ORM
+// ======================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Enums ====================
+
+/// أدوار المستخدمين - Role Based Access Control
+enum UserRole {
+  ADMIN // مدير النظام - صلاحيات كاملة
+  MANAGER // مدير فرع
+  CASHIER // كاشير - استقبال الطلبات والدفع
+  WORKER // عامل مغسلة - تحديث حالة الطلبات
+  DELIVERY // مندوب توصيل
+}
+
+/// دورة حياة الطلب - تقدم للأمام فقط
+enum OrderStatus {
+  RECEIVED // تم الاستلام
+  INSPECTING // فحص وفرز
+  WASHING // غسيل
+  DRYING // تجفيف
+  IRONING // كي
+  PACKING // تغليف
+  READY // جاهز للتسليم
+  DELIVERED // تم التسليم
+  CANCELLED // ملغي
+}
+
+/// حالة الدفع
+enum PaymentStatus {
+  UNPAID // غير مدفوع
+  PARTIAL // مدفوع جزئياً
+  PAID // مدفوع بالكامل
+  REFUNDED // مسترجع
+}
+
+/// طريقة الدفع
+enum PaymentMethod {
+  CASH // نقدي
+  CARD // بطاقة
+  BANK_TRANSFER // تحويل بنكي
+  MOBILE_WALLET // محفظة إلكترونية
+}
+
+/// حالة الدفعة الواحدة (منفصلة عن PaymentStatus الخاص بالطلب)
+enum PaymentTxStatus {
+  PENDING // قيد الانتظار (تحويل لم يُؤكد بعد)
+  COMPLETED // مكتملة
+  FAILED // فشلت
+  CANCELLED // ملغاة (قبل الاكتمال)
+  REFUNDED // مستردة بالكامل
+}
+
+/// وحدة تسعير الخدمة
+enum ServiceUnit {
+  PIECE // بالقطعة
+  KG // بالكيلو
+  FIXED // سعر ثابت
+}
+
+/// دورة حياة الفاتورة - DRAFT/CANCELLED تُضبَطان يدوياً فقط،
+/// ISSUED/PARTIALLY_PAID/PAID تُشتق تلقائياً من paidAmount مقابل total
+enum InvoiceStatus {
+  DRAFT // مسودة قبل الإصدار الرسمي
+  ISSUED // صادرة، لا مبلغ مدفوع بعد
+  PARTIALLY_PAID // مدفوعة جزئياً
+  PAID // مدفوعة بالكامل
+  CANCELLED // ملغاة
+}
+
+/// أحداث سجل التدقيق الأمني
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  TOKEN_REFRESHED
+  TOKEN_REUSE_DETECTED
+  ACCOUNT_LOCKED
+  PASSWORD_CHANGED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  SESSION_REVOKED
+  PAYMENT_CREATED
+  PAYMENT_UPDATED
+  PAYMENT_REFUNDED
+  PAYMENT_CANCELLED
+  SETTINGS_UPDATED
+  SYSTEM_BACKUP_CREATED
+  INVOICE_CREATED
+  INVOICE_UPDATED
+  INVOICE_DELETED
+  INVOICE_STATUS_CHANGED
+  INVOICE_PRINTED
+  INVOICE_DOWNLOADED
+  INVOICE_EMAILED
+  NOTIFICATION_PREFERENCES_UPDATED
+  /// Phase 5 - تصدير تقرير (CSV/Excel/PDF/Print) - metadata يحمل النوع والصيغة والفلاتر
+  REPORT_EXPORTED
+  /// Phase 6 - عمليات النسخ الاحتياطي (الإنشاء يستخدم SYSTEM_BACKUP_CREATED القائم)
+  BACKUP_RESTORED
+  BACKUP_DELETED
+  BACKUP_RETRIED
+  BACKUP_SETTINGS_UPDATED
+  /// Phase 7 - المخزون والموردون والمشتريات
+  INVENTORY_ITEM_CREATED
+  INVENTORY_ITEM_UPDATED
+  INVENTORY_ITEM_DELETED
+  INVENTORY_ADJUSTED
+  INVENTORY_TRANSFERRED
+  INVENTORY_COUNTED
+  SUPPLIER_CREATED
+  SUPPLIER_UPDATED
+  SUPPLIER_DELETED
+  PURCHASE_CREATED
+  PURCHASE_UPDATED
+  PURCHASE_DELETED
+  PURCHASE_RECEIVED
+  PURCHASE_CANCELLED
+  /// Phase 8 - الباركود والملصقات والمسح
+  BARCODE_GENERATED
+  BARCODE_UPDATED
+  BARCODE_DELETED
+  LABEL_PRINTED
+  BARCODE_SCANNED
+  LABEL_TEMPLATE_CREATED
+  LABEL_TEMPLATE_UPDATED
+  LABEL_TEMPLATE_DELETED
+  /// Phase 9 - الولاء والعضوية والكوبونات
+  LOYALTY_POINTS_EARNED
+  LOYALTY_POINTS_REDEEMED
+  LOYALTY_POINTS_REVERSED
+  LOYALTY_POINTS_EXPIRED
+  LOYALTY_POINTS_ADJUSTED
+  LOYALTY_SETTINGS_UPDATED
+  MEMBERSHIP_UPGRADED
+  MEMBERSHIP_DOWNGRADED
+  MEMBERSHIP_TIER_UPDATED
+  COUPON_CREATED
+  COUPON_UPDATED
+  COUPON_DELETED
+  COUPON_REDEEMED
+  CAMPAIGN_CREATED
+  CAMPAIGN_UPDATED
+  /// Phase 9.5 - الإدارة والموظفون وإغلاق اليوم
+  DAY_OPENED
+  DAY_CLOSED
+  DAY_REOPENED
+  DAY_APPROVED
+  EMPLOYEE_UPDATED
+  USER_FORCE_LOGOUT
+  /// Phase 9.6b - الموارد البشرية
+  ATTENDANCE_UPDATED
+  LEAVE_REQUESTED
+  LEAVE_REVIEWED
+  PAYROLL_GENERATED
+  PAYROLL_APPROVED
+  EMPLOYEE_DOCUMENT_UPDATED
+  /// Phase 9.6c - الإدارة الفائقة
+  USER_PERMISSION_OVERRIDE
+  USER_IMPERSONATED
+  USER_BRANCH_CHANGED
+}
+
+/// نوع الإشعار - كل نوع مرتبط بحدث عمل حقيقي واحد (Phase 4B: توسعة كاملة لكل الوحدات)
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+  PAYMENT_RECEIVED
+  PAYMENT_REFUNDED
+  PAYMENT_CANCELLED
+  INVOICE_CREATED
+  INVOICE_SENT
+  BACKUP_COMPLETED
+  BACKUP_FAILED
+  NEW_DEVICE_LOGIN
+  ACCOUNT_LOCKED
+  PASSWORD_RESET
+  SYSTEM_SETTINGS_UPDATED
+  USER_CREATED
+  USER_DISABLED
+  /// Phase 7 - أحداث المخزون (بثّ لـ ADMIN/MANAGER عبر الـ bus القائم)
+  LOW_STOCK
+  OUT_OF_STOCK
+  PURCHASE_RECEIVED
+  PURCHASE_CANCELLED
+  STOCK_ADJUSTED
+  /// Phase 8 - أحداث الباركود (بثّ لـ ADMIN/MANAGER)
+  BARCODE_GENERATED
+  LABEL_PRINTED
+  LOW_STOCK_SCANNED
+  INVALID_SCAN
+  /// Phase 9 - الولاء والعضوية والكوبونات (بثّ لـ ADMIN/MANAGER)
+  POINTS_EARNED
+  POINTS_REDEEMED
+  POINTS_EXPIRED
+  MEMBERSHIP_UPGRADED
+  MEMBERSHIP_DOWNGRADED
+  COUPON_CREATED
+  COUPON_EXPIRED
+  COUPON_USED
+  /// Phase 9.5 - إغلاق اليوم المحاسبي (بثّ لـ ADMIN/MANAGER)
+  DAY_OPENED
+  DAY_CLOSED
+  DAY_REOPENED
+  /// إشعار اختباري يدوي (Phase 4D) - موجّه للمستخدم نفسه دائماً، لا صف تفضيل خاص به
+  TEST
+}
+
+/// وضع تجميع الإشعارات - Phase 4D: يُخزَّن فقط حالياً، لا Scheduler جديد يُطبِّقه
+enum DigestMode {
+  INSTANT
+  HOURLY
+  DAILY
+  WEEKLY
+}
+
+/// قناة تسليم الإشعار
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+/// حالة تسليم صف الـ Outbox (للقنوات الخارجية فقط - IN_APP لا يمر بهذه الحالة)
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// أولوية الإشعار - تؤثر على العرض بالواجهة فقط، لا تغيّر منطق التسليم
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+// ==================== Backup (Phase 6) ====================
+
+/// حالة سجل النسخة الاحتياطية
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+/// وجهة تخزين النسخة - LOCAL حقيقي؛ S3/R2/BACKBLAZE مزوّدات Scaffold
+/// (configured=false بلا credentials بالبيئة - نفس نمط قنوات الإشعارات)
+enum BackupProvider {
+  LOCAL
+  S3
+  R2
+  BACKBLAZE
+}
+
+/// مصدر تشغيل النسخة - يدوي أو عبر الجدولة الداخلية
+enum BackupTrigger {
+  MANUAL
+  SCHEDULED
+}
+
+/// تكرار الجدولة
+enum BackupScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+// ==================== Inventory (Phase 7) ====================
+
+/// نوع صنف المخزون - منتج نهائي أو مادة خام
+enum InventoryItemType {
+  PRODUCT
+  RAW_MATERIAL
+}
+
+/// وحدة قياس المخزون
+enum InventoryUnit {
+  PIECE
+  KG
+  GRAM
+  LITER
+  METER
+  BOX
+  PACK
+}
+
+/// نوع حركة المخزون - سجل حركات كامل (Ledger)
+enum InventoryTransactionType {
+  IN
+  OUT
+  RETURN
+  ADJUSTMENT
+  LOSS
+  TRANSFER
+  OPENING
+  CLOSING
+}
+
+/// حالة أمر الشراء
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+/// نوع تنبيه المخزون
+enum InventoryAlertType {
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+/// حالة تنبيه المخزون
+enum InventoryAlertStatus {
+  OPEN
+  RESOLVED
+}
+
+// ==================== Barcode & QR (Phase 8) ====================
+
+/// نوع الباركود المدعوم لكل صنف
+enum BarcodeType {
+  CODE128
+  CODE39
+  EAN13
+  EAN8
+  UPC
+  QR
+}
+
+/// مقاس ملصق الطباعة
+enum LabelSize {
+  A4
+  THERMAL_58
+  THERMAL_80
+  CUSTOM
+}
+
+/// إجراء المسح - يحدّد ما يحدث عند مسح الكود
+enum ScanAction {
+  VIEW
+  ADJUST
+  MOVEMENT
+  RECEIVE
+  SELL
+  TRANSFER
+  COUNT
+  LOOKUP
+}
+
+// ==================== Loyalty / Membership / Coupons (Phase 9) ====================
+
+/// نوع حركة نقاط الولاء (Ledger)
+enum LoyaltyTxType {
+  EARN
+  REDEEM
+  REVERSE
+  EXPIRE
+  ADJUST
+  BONUS
+  WELCOME
+  BIRTHDAY
+  REFERRAL
+}
+
+/// مصدر حركة النقاط
+enum LoyaltyTxSource {
+  ORDER
+  INVOICE
+  MANUAL
+  CAMPAIGN
+  REFERRAL
+  SYSTEM
+}
+
+/// طريقة احتساب نقاط الكسب
+enum LoyaltyEarnMode {
+  FIXED_PER_ORDER // نقاط ثابتة لكل طلب
+  PERCENTAGE // نسبة من إجمالي الطلب
+}
+
+/// مستويات العضوية
+enum MembershipLevel {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+/// نوع الكوبون
+enum CouponType {
+  FIXED // خصم مبلغ ثابت
+  PERCENTAGE // خصم نسبة
+  FREE_SERVICE
+  FREE_DELIVERY
+  GIFT
+  REFERRAL
+  BIRTHDAY
+}
+
+/// نوع الحملة الترويجية للنقاط
+enum CampaignType {
+  BONUS
+  WELCOME
+  BIRTHDAY
+  REFERRAL
+}
+
+// ==================== Admin / Employees / Day Closing (Phase 9.5) ====================
+
+/// حالة توظيف الموظف
+enum EmploymentStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+  ARCHIVED
+}
+
+/// نوع عقد الموظف
+enum ContractType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+}
+
+/// حالة إغلاق اليوم المحاسبي
+enum DayStatus {
+  OPEN
+  CLOSED
+  REOPENED
+}
+
+// ---- Phase 9.6b: HR (الحضور/الإجازات/الرواتب/المستندات) ----
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+  HALF_DAY
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  EMERGENCY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+enum SalaryComponentType {
+  ALLOWANCE
+  DEDUCTION
+  BONUS
+}
+
+enum EmployeeDocumentType {
+  CONTRACT
+  ID_CARD
+  PASSPORT
+  CERTIFICATE
+  OTHER
+}
+
+// ==================== Models ====================
+
+/// الفروع
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  orders   Order[]
+  invoices Invoice[]
+
+  @@map("branches")
+}
+
+/// المستخدمون (الموظفون)
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         UserRole @default(CASHIER)
+  isActive     Boolean  @default(true)
+  avatarUrl    String? // Cloudinary
+
+  // Account security
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime? // مقفول حتى هذا الوقت بعد محاولات فاشلة
+  passwordChangedAt   DateTime? // لإبطال الـ tokens الأقدم من تغيير كلمة السر
+  resetTokenHash      String?   @unique // hash لرمز استعادة كلمة السر
+  resetTokenExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  refreshTokens           RefreshToken[]
+  ordersCreated           Order[]                   @relation("OrderCreatedBy")
+  payments                Payment[]
+  auditLogs               AuditLog[]
+  statusChanges           OrderStatusHistory[]      @relation("StatusChangedBy")
+  invoicesCreated         Invoice[]                 @relation("InvoiceCreatedBy")
+  invoicesUpdated         Invoice[]                 @relation("InvoiceUpdatedBy")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  notificationSettings    UserNotificationSettings?
+  backupsCreated          BackupRecord[]            @relation("BackupCreatedBy")
+  inventoryTransactions   InventoryTransaction[]    @relation("InventoryActor")
+  inventoryAdjustments    InventoryAdjustment[]     @relation("AdjustmentActor")
+  inventorySnapshots      InventorySnapshot[]       @relation("SnapshotCreatedBy")
+  purchasesCreated        Purchase[]                @relation("PurchaseCreatedBy")
+  labelPrintLogs          LabelPrintLog[]           @relation("PrintActor")
+  barcodeScanLogs         BarcodeScanLog[]          @relation("ScanActor")
+  labelTemplatesCreated   LabelTemplate[]           @relation("TemplateCreatedBy")
+  employeeProfile         EmployeeProfile? // Phase 9.5 - ملف موظف اختياري 1-1
+  permissionOverrides     UserPermissionOverride[] // Phase 9.6c - تجاوزات صلاحيات
+
+  @@index([branchId])
+  @@map("users")
+}
+
+/// Refresh Tokens لتجديد جلسات JWT
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String? // بيانات الجلسة - Session Management
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// سجل تدقيق أمني لعمليات المصادقة
+model AuditLog {
+  id        String      @id @default(cuid())
+  action    AuditAction
+  email     String? // البريد المُدخل (حتى للمحاولات الفاشلة بمستخدم غير موجود)
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// العملاء
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders   Order[]
+  invoices Invoice[]
+
+  // Phase 9 - الولاء والكوبونات (علاقات إضافية فقط، لا تكسر استجابة العميل الحالية)
+  loyaltyAccount      LoyaltyAccount?
+  loyaltyTransactions LoyaltyTransaction[]
+  couponRedemptions   CouponRedemption[]
+
+  @@index([phone])
+  @@map("customers")
+}
+
+/// تصنيفات الخدمات (ملابس، مفروشات، سجاد...)
+model ServiceCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+/// الخدمات (غسيل قميص، كي بدلة، غسيل سجاد بالكيلو...)
+model Service {
+  id             String      @id @default(cuid())
+  name           String
+  description    String?
+  price          Decimal     @db.Decimal(10, 2)
+  unit           ServiceUnit @default(PIECE)
+  estimatedHours Int? // مدة التنفيذ المتوقعة بالساعات
+  imageUrl       String? // Cloudinary
+  isActive       Boolean     @default(true)
+  sortOrder      Int         @default(0) // ترتيب العرض
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  categoryId String
+  category   ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  orderItems   OrderItem[]
+  invoiceItems InvoiceItem[]
+
+  @@unique([categoryId, name]) // لا تكرار لاسم الخدمة داخل نفس التصنيف
+  @@index([categoryId])
+  @@map("services")
+}
+
+/// الطلبات
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique // ORD-YYYY-000001 - يُولد بالخادم
+  status        OrderStatus   @default(RECEIVED)
+  paymentStatus PaymentStatus @default(UNPAID)
+
+  subtotal   Decimal @db.Decimal(10, 2) // مجموع البنود
+  discount   Decimal @default(0) @db.Decimal(10, 2)
+  total      Decimal @db.Decimal(10, 2) // بعد الخصم
+  paidAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  notes       String?
+  receivedAt  DateTime  @default(now())
+  dueDate     DateTime? // موعد التسليم المتوقع
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  createdById String
+  createdBy   User   @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  items         OrderItem[]
+  payments      Payment[]
+  statusHistory OrderStatusHistory[]
+  invoice       Invoice?
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("orders")
+}
+
+/// بنود الطلب
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Decimal @db.Decimal(10, 2) // يدعم الكسور للوزن بالكيلو
+  unitPrice Decimal @db.Decimal(10, 2) // سعر الخدمة وقت الطلب - snapshot
+  discount  Decimal @default(0) @db.Decimal(10, 2) // خصم على مستوى العنصر
+  subtotal  Decimal @db.Decimal(10, 2) // quantity*unitPrice - discount
+  notes     String?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([serviceId])
+  @@map("order_items")
+}
+
+/// سجل تغييرات حالة الطلب - كل انتقال يُوثق
+model OrderStatusHistory {
+  id        String       @id @default(cuid())
+  oldStatus OrderStatus? // null عند إنشاء الطلب
+  newStatus OrderStatus
+  notes     String?
+  createdAt DateTime     @default(now())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  changedById String
+  changedBy   User   @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+/// المدفوعات
+model Payment {
+  id             String          @id @default(cuid())
+  amount         Decimal         @db.Decimal(10, 2)
+  method         PaymentMethod   @default(CASH)
+  status         PaymentTxStatus @default(COMPLETED)
+  refundedAmount Decimal         @default(0) @db.Decimal(10, 2) // الاسترداد التراكمي
+  reference      String? // رقم مرجعي للتحويل/البطاقة
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  receivedById String
+  receivedBy   User   @relation(fields: [receivedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+/// إعدادات النظام - صف واحد فقط (Singleton بمعرّف ثابت "singleton")
+/// لا يوجد Session Timeout ولا Password Minimum Length هنا عمداً - كلاهما
+/// قيمة حقيقية مُطبَّقة فعلياً بمكان آخر (env vars / auth validators) -
+/// راجع settings.constants.ts للتفاصيل الكاملة لتفادي مصدرين متعارضين للحقيقة
+model SystemSettings {
+  id String @id @default("singleton")
+
+  // ---- General ----
+  companyName     String  @default("Laundry ERP")
+  companyEmail    String?
+  companyPhone    String?
+  companyAddress  String?
+  companyLogoUrl  String?
+  defaultCurrency String  @default("EGP")
+  defaultTimezone String  @default("Africa/Cairo")
+  defaultLanguage String  @default("ar")
+
+  // ---- Appearance ----
+  defaultTheme String  @default("system") // light | dark | system
+  rtlEnabled   Boolean @default(true)
+  dateFormat   String  @default("DD/MM/YYYY")
+  timeFormat   String  @default("24h") // 12h | 24h
+
+  // ---- Notifications (تفضيلات مُخزَّنة - Email فقط له بنية إرسال حقيقية
+  // حالياً، مُستخدَمة فقط لإعادة تعيين كلمة السر وليس إشعارات عامة بعد؛
+  // SMS/In-App بلا أي بنية إرسال فعلية إطلاقاً - راجع التقرير) ----
+  emailNotificationsEnabled Boolean @default(true)
+  smsNotificationsEnabled   Boolean @default(false)
+  inAppNotificationsEnabled Boolean @default(true)
+
+  // ---- Security (Password Expiration فقط - غير مُطبَّقة بأي فحص تشغيلي
+  // بعد، تخزين تهيئة لميزة مستقبلية بصدق، وليس ميزة تعمل الآن) ----
+  passwordExpirationDays Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+/// الفواتير - فاتورة واحدة لكل طلب (Order.id فريد هنا)
+/// subtotal/discount/customerId/branchId لقطة (Snapshot) من الطلب وقت الإصدار -
+/// لا تُعاد حسابها من بنود الطلب لتفادي تكرار منطق computeTotals بوحدة orders
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique // INV-YYYY-000001 - يُولد بالخادم
+  status        InvoiceStatus @default(ISSUED)
+
+  subtotal        Decimal @db.Decimal(10, 2) // نسخة من Order.subtotal وقت الإصدار
+  discount        Decimal @default(0) @db.Decimal(10, 2) // نسخة من Order.discount وقت الإصدار
+  tax             Decimal @default(0) @db.Decimal(10, 2)
+  total           Decimal @db.Decimal(10, 2) // subtotal - discount + tax
+  paidAmount      Decimal @default(0) @db.Decimal(10, 2) // لقطة من Order.paidAmount وقت الإصدار
+  remainingAmount Decimal @db.Decimal(10, 2) // max(total - paidAmount, 0)
+
+  notes     String?
+  issuedAt  DateTime  @default(now())
+  dueDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  orderId String @unique // فاتورة واحدة لكل طلب
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  createdById String
+  createdBy   User   @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  updatedById String?
+  updatedBy   User?   @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  items InvoiceItem[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([orderId])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("invoices")
+}
+
+/// بنود الفاتورة - لقطة (Snapshot) من بنود الطلب وقت الإصدار، تشمل اسم
+/// الخدمة نفسه (serviceNameSnapshot) حتى لا تتغيّر الفاتورة لو أُعيدت تسمية الخدمة لاحقاً
+model InvoiceItem {
+  id                  String   @id @default(cuid())
+  serviceNameSnapshot String
+  quantity            Decimal  @db.Decimal(10, 2)
+  unitPrice           Decimal  @db.Decimal(10, 2)
+  total               Decimal  @db.Decimal(10, 2)
+  createdAt           DateTime @default(now())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([serviceId])
+  @@map("invoice_items")
+}
+
+/// الإشعار - أيضاً سجل التسليم الرسمي لقناة IN_APP نفسها (لا صف Outbox منفصل لها)
+model Notification {
+  id       String               @id @default(cuid())
+  type     NotificationType
+  title    String
+  body     String
+  data     Json? // بيانات إضافية حرة (orderId, invoiceNumber...) لبناء رابط التنقل بالواجهة
+  priority NotificationPriority @default(NORMAL)
+
+  entityType String? // "Order" | "Invoice" | "Payment" | "Backup" | "Session" - للربط بالكيان المصدر
+  entityId   String?
+
+  readAt     DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deliveries NotificationDelivery[]
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([userId, archivedAt])
+  @@map("notifications")
+}
+
+/// صف Outbox لتسليم قناة خارجية واحدة (EMAIL/SMS/WHATSAPP/PUSH) لإشعار واحد -
+/// يُعالَج بواسطة notification.scheduler (بلا Redis - قاعدة البيانات هي الطابور)
+model NotificationDelivery {
+  id        String              @id @default(cuid())
+  channel   NotificationChannel
+  status    DeliveryStatus      @default(PENDING)
+  attempts  Int                 @default(0)
+  lastError String?
+
+  scheduledAt DateTime  @default(now()) // متى يُستحق التسليم/إعادة المحاولة
+  sentAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([notificationId])
+  @@map("notification_deliveries")
+}
+
+/// تفضيلات المستخدم لكل نوع إشعار - غياب الصف لنوع ما يعني الافتراضيات الآمنة بالكود
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  type     NotificationType
+  inApp    Boolean          @default(true)
+  email    Boolean          @default(false)
+  sms      Boolean          @default(false)
+  whatsapp Boolean          @default(false)
+  push     Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+/// إعدادات القنوات العامة للمستخدم (Phase 4D) - صف واحد لكل مستخدم (Singleton بالمستخدم).
+/// مفاتيح رئيسية تُسكت قناة بالكامل بصرف النظر عن NotificationPreference لكل نوع -
+/// الافتراضي true للكل حتى لا يُغيَّر سلوك أي مستخدم حالي عند الترقية (لا صف = لا قيد إضافي)
+model UserNotificationSettings {
+  id String @id @default(cuid())
+
+  globalInApp    Boolean @default(true)
+  globalEmail    Boolean @default(true)
+  globalSms      Boolean @default(true)
+  globalWhatsapp Boolean @default(true)
+  globalPush     Boolean @default(true)
+
+  /// "HH:mm" بتوقيت quietHoursTimezone - null يعني غير مُهيَّأ (quietHoursEnabled يبقى false عندها فعلياً)
+  quietHoursEnabled  Boolean @default(false)
+  quietHoursStart    String?
+  quietHoursEnd      String?
+  quietHoursTimezone String  @default("Africa/Cairo")
+
+  /// يُخزَّن فقط - لا Scheduler جديد يُطبِّقه بهذه المرحلة (راجع القرارات المعمارية بالتقرير)
+  digestMode DigestMode @default(INSTANT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_settings")
+}
+
+/// سجل نسخة احتياطية واحدة (Phase 6) - History/Statistics/Retry/Restore تعتمد عليه.
+/// الملف نفسه يُخزَّن على القرص (storagePath)؛ هذا الصف بيانات وصفية فقط.
+model BackupRecord {
+  id       String         @id @default(cuid())
+  filename String
+  provider BackupProvider @default(LOCAL)
+  trigger  BackupTrigger  @default(MANUAL)
+  status   BackupStatus   @default(PENDING)
+
+  /// مسار الملف على القرص (LOCAL) أو مفتاح الكائن (السحابة مستقبلاً) - null إن فشل قبل الكتابة
+  storagePath String?
+  sizeBytes   Int? // حجم الملف الناتج بالبايت
+  checksum    String? // sha256 hex للملف الناتج - للتحقق عند الاستعادة
+  appVersion  String? // نسخة التطبيق وقت الإنشاء
+  compressed  Boolean @default(false)
+  encrypted   Boolean @default(false)
+  counts      Json? // لقطة أعداد الجداول وقت الإنشاء
+  durationMs  Int? // مدة التنفيذ
+  error       String? // رسالة الفشل إن وُجدت
+  retryCount  Int     @default(0) // يزيد مع كل إعادة محاولة (نفس السجل، بلا سجل جديد)
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // Soft delete - Cleanup/حذف يدوي
+
+  createdById String? // null للنسخ المُجدوَلة (بلا فاعل بشري)
+  createdBy   User?   @relation("BackupCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("backup_records")
+}
+
+/// إعدادات النسخ الاحتياطي (Phase 6) - صف Singleton مستقل عن SystemSettings
+/// عمداً (لعدم تغيير عقد /settings ولعزل تهيئة المزوّد عن الإعدادات العامة).
+/// أسرار السحابة (credentials) تأتي من متغيّرات البيئة لا من هنا - أمان.
+model BackupSettings {
+  id String @id @default("singleton")
+
+  // ---- Storage ----
+  provider           BackupProvider @default(LOCAL)
+  compressionEnabled Boolean        @default(false)
+  encryptionEnabled  Boolean        @default(false)
+
+  // ---- Retention ----
+  retentionDays Int @default(30) // حذف ناعم لما هو أقدم من هذه المدة
+  keepLastN     Int @default(10) // الإبقاء على آخر N نسخة ناجحة على الأقل
+
+  // ---- Schedule (Scheduler داخلي - بلا Redis/Queue جديدة) ----
+  scheduleEnabled   Boolean                 @default(false)
+  scheduleFrequency BackupScheduleFrequency @default(DAILY)
+  scheduleTime      String                  @default("02:00") // "HH:mm" بتوقيت scheduleTimezone
+  scheduleTimezone  String                  @default("Africa/Cairo")
+
+  // ---- Runtime state ----
+  lastRunAt          DateTime?
+  nextRunAt          DateTime?
+  lastSuccessAt      DateTime?
+  lastFailureAt      DateTime?
+  scheduleRetryCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("backup_settings")
+}
+
+// ==================== Inventory (Phase 7) ====================
+
+/// المورّدون
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  taxNumber   String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items     InventoryItem[]
+  purchases Purchase[]
+
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+/// أصناف المخزون (منتجات + مواد خام) - quantity لقطة مُحدَّثة داخل معاملات فقط
+model InventoryItem {
+  id          String            @id @default(cuid())
+  sku         String            @unique // معرّف فريد للصنف
+  name        String
+  type        InventoryItemType @default(PRODUCT)
+  unit        InventoryUnit     @default(PIECE)
+  category    String? // تصنيف نصّي حر (لا جدول منفصل - تبسيط متعمّد)
+  description String?
+
+  quantity     Decimal @default(0) @db.Decimal(14, 3) // الرصيد الحالي - يتغيّر داخل معاملات الحركة فقط
+  reorderLevel Decimal @default(0) @db.Decimal(14, 3) // حدّ إعادة الطلب (تنبيه نقص)
+  costPrice    Decimal @default(0) @db.Decimal(12, 2) // متوسط تكلفة الوحدة
+  sellPrice    Decimal @default(0) @db.Decimal(12, 2)
+
+  // ---- Barcode & QR (Phase 8) - كلها اختيارية إضافية، لا تكسر أي استجابة قائمة ----
+  barcode       String?      @unique // قيمة الباركود الخطّي (فريدة عالمياً)
+  barcodeType   BarcodeType? // نوع الترميز المختار للصنف
+  qrCode        String? // حمولة الـ QR (payload)
+  printCount    Int          @default(0) // عدد مرات طباعة ملصق هذا الصنف
+  lastPrintedAt DateTime?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  labelTemplateId String?
+  labelTemplate   LabelTemplate? @relation(fields: [labelTemplateId], references: [id], onDelete: SetNull)
+
+  transactions  InventoryTransaction[]
+  purchaseItems PurchaseItem[]
+  adjustments   InventoryAdjustment[]
+  snapshots     InventorySnapshot[]
+  alerts        InventoryAlert[]
+  printLogs     LabelPrintLog[]
+  scanLogs      BarcodeScanLog[]
+
+  @@index([type])
+  @@index([isActive])
+  @@index([supplierId])
+  @@index([name])
+  @@index([barcodeType])
+  @@map("inventory_items")
+}
+
+/// سجل حركات المخزون (Ledger) - كل تغيّر رصيد يُسجَّل هنا مع before/after
+model InventoryTransaction {
+  id             String                   @id @default(cuid())
+  type           InventoryTransactionType
+  quantity       Decimal                  @db.Decimal(14, 3) // موجب دائماً - النوع يحدّد الاتجاه
+  beforeQuantity Decimal                  @db.Decimal(14, 3)
+  afterQuantity  Decimal                  @db.Decimal(14, 3)
+  unitCost       Decimal?                 @db.Decimal(12, 2)
+  reference      String? // مرجع خارجي (رقم شراء/تحويل/جرد)
+  note           String?
+  createdAt      DateTime                 @default(now())
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  actorId String?
+  actor   User?   @relation("InventoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@index([type])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+/// أوامر الشراء من المورّدين
+model Purchase {
+  id             String         @id @default(cuid())
+  purchaseNumber String         @unique // PUR-YYYY-000001 - يُولَّد بالخادم
+  status         PurchaseStatus @default(DRAFT)
+
+  subtotal Decimal @default(0) @db.Decimal(14, 2)
+  taxRate  Decimal @default(0) @db.Decimal(5, 2) // نسبة مئوية
+  tax      Decimal @default(0) @db.Decimal(14, 2)
+  total    Decimal @default(0) @db.Decimal(14, 2)
+
+  notes      String?
+  orderedAt  DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  createdById String
+  createdBy   User   @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  items PurchaseItem[]
+
+  @@index([status])
+  @@index([supplierId])
+  @@index([createdAt])
+  @@map("purchases")
+}
+
+/// بنود أمر الشراء
+model PurchaseItem {
+  id       String  @id @default(cuid())
+  quantity Decimal @db.Decimal(14, 3)
+  unitCost Decimal @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(14, 2)
+
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseId])
+  @@index([itemId])
+  @@map("purchase_items")
+}
+
+/// سجل تعديلات المخزون اليدوية (يرافقه دائماً InventoryTransaction ADJUSTMENT)
+model InventoryAdjustment {
+  id               String   @id @default(cuid())
+  previousQuantity Decimal  @db.Decimal(14, 3)
+  newQuantity      Decimal  @db.Decimal(14, 3)
+  delta            Decimal  @db.Decimal(14, 3) // newQuantity - previousQuantity
+  reason           String
+  createdAt        DateTime @default(now())
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  actorId String?
+  actor   User?   @relation("AdjustmentActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@map("inventory_adjustments")
+}
+
+/// لقطة جرد لصنف - نظام مقابل معدود لحظة الجرد
+model InventorySnapshot {
+  id              String   @id @default(cuid())
+  systemQuantity  Decimal  @db.Decimal(14, 3) // رصيد النظام لحظة الجرد
+  countedQuantity Decimal  @db.Decimal(14, 3) // المعدود فعلياً
+  difference      Decimal  @db.Decimal(14, 3) // counted - system
+  note            String?
+  createdAt       DateTime @default(now())
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  createdById String?
+  createdBy   User?   @relation("SnapshotCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@map("inventory_snapshots")
+}
+
+/// تنبيهات نقص/نفاد المخزون - صف OPEN واحد فعّال لكل صنف يمنع تكرار الإشعار
+model InventoryAlert {
+  id         String               @id @default(cuid())
+  type       InventoryAlertType
+  status     InventoryAlertStatus @default(OPEN)
+  quantity   Decimal              @db.Decimal(14, 3) // الرصيد لحظة التنبيه
+  threshold  Decimal              @db.Decimal(14, 3) // حدّ إعادة الطلب لحظة التنبيه
+  createdAt  DateTime             @default(now())
+  resolvedAt DateTime?
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, status])
+  @@index([status])
+  @@map("inventory_alerts")
+}
+
+// ==================== Barcode & QR (Phase 8) ====================
+
+/// قوالب ملصقات الطباعة - أي الحقول تظهر ومقاس الملصق
+model LabelTemplate {
+  id   String    @id @default(cuid())
+  name String
+  size LabelSize @default(A4)
+
+  // أبعاد الملصق بالملّيمتر (للمقاس CUSTOM أو تجاوز الافتراضي)
+  widthMm  Int?
+  heightMm Int?
+
+  // أي عناصر تظهر على الملصق (تهيئة عرض فقط)
+  showName        Boolean @default(true)
+  showSku         Boolean @default(true)
+  showBarcode     Boolean @default(true)
+  showQr          Boolean @default(false)
+  showPrice       Boolean @default(true)
+  showCategory    Boolean @default(false)
+  showSupplier    Boolean @default(false)
+  showLogo        Boolean @default(false)
+  showCompanyName Boolean @default(true)
+
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdById String?
+  createdBy   User?   @relation("TemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  items InventoryItem[]
+
+  @@index([isActive])
+  @@map("label_templates")
+}
+
+/// سجل طباعة الملصقات - Print History + عدّاد الطباعة
+model LabelPrintLog {
+  id        String    @id @default(cuid())
+  size      LabelSize
+  quantity  Int       @default(1) // عدد الملصقات المطبوعة لهذا الصنف بهذه العملية
+  createdAt DateTime  @default(now())
+
+  itemId String?
+  item   InventoryItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  templateId   String?
+  // القالب لا يملك علاقة عكسية (لقطة اسم فقط) - نُخزّن الاسم لتفادي اعتماد حذف القالب
+  templateName String?
+
+  createdById String?
+  createdBy   User?   @relation("PrintActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@index([createdAt])
+  @@map("label_print_logs")
+}
+
+/// سجل مسح الباركود - Most Scanned + Invalid Scan + تتبّع الإجراءات
+model BarcodeScanLog {
+  id        String     @id @default(cuid())
+  code      String // القيمة الممسوحة كما وصلت
+  action    ScanAction @default(LOOKUP)
+  success   Boolean    @default(true) // false للمسح غير المُطابِق (Invalid Scan)
+  createdAt DateTime   @default(now())
+
+  itemId String?
+  item   InventoryItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("ScanActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@index([success])
+  @@index([createdAt])
+  @@map("barcode_scan_logs")
+}
+
+// ==================== Loyalty / Membership / Coupons (Phase 9) ====================
+
+/// حساب ولاء العميل - صف واحد لكل عميل، يُحدَّث داخل معاملات فقط
+model LoyaltyAccount {
+  id              String          @id @default(cuid())
+  currentPoints   Int             @default(0) // المتاح للاستبدال الآن
+  lifetimePoints  Int             @default(0) // إجمالي ما كُسب على الإطلاق (يحدّد المستوى)
+  redeemedPoints  Int             @default(0)
+  expiredPoints   Int             @default(0)
+  membershipLevel MembershipLevel @default(BRONZE)
+  levelSince      DateTime        @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([membershipLevel])
+  @@map("loyalty_accounts")
+}
+
+/// سجل حركات نقاط الولاء (Ledger) - كل تغيّر رصيد يُسجَّل
+model LoyaltyTransaction {
+  id           String          @id @default(cuid())
+  type         LoyaltyTxType
+  source       LoyaltyTxSource @default(SYSTEM)
+  points       Int // موجب (كسب) أو سالب (استبدال/انتهاء/عكس)
+  balanceAfter Int // رصيد currentPoints بعد الحركة
+  reference    String? // رقم طلب/فاتورة/حملة
+  note         String?
+  expiresAt    DateTime? // للنقاط المكتسبة - تنتهي بعد مدة
+  reversed     Boolean         @default(false) // هل عُكِست هذه الحركة (منع عكس مزدوج)
+  createdById  String? // فاعل بشري (بلا علاقة FK - يبقى User بلا تعديل)
+  orderId      String? // مرجع الطلب (بلا FK - يبقى Order بلا تعديل)
+  createdAt    DateTime        @default(now())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@index([type])
+  @@index([orderId])
+  @@index([expiresAt])
+  @@map("loyalty_transactions")
+}
+
+/// إعدادات الولاء (Singleton) - قواعد الاحتساب والمكافآت
+model LoyaltySettings {
+  id String @id @default("singleton")
+
+  earnMode          LoyaltyEarnMode @default(PERCENTAGE)
+  pointsPerCurrency Decimal         @default(1) @db.Decimal(10, 2) // نقاط لكل وحدة عملة (PERCENTAGE) أو نقاط ثابتة (FIXED_PER_ORDER)
+  minOrderForPoints Decimal         @default(0) @db.Decimal(10, 2)
+  maxPointsPerOrder Int?
+  redeemValue       Decimal         @default(1) @db.Decimal(10, 4) // قيمة النقطة الواحدة بالعملة عند الاستبدال
+  minPointsToRedeem Int             @default(0)
+  pointExpiryDays   Int? // انتهاء النقاط بعد N يوم (null = لا تنتهي)
+
+  welcomeBonus  Int @default(0)
+  birthdayBonus Int @default(0)
+  referralBonus Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("loyalty_settings")
+}
+
+/// تهيئة مستوى العضوية - عتبات ومزايا كل مستوى (5 صفوف)
+model MembershipTierConfig {
+  id                 String          @id @default(cuid())
+  level              MembershipLevel @unique
+  minLifetimePoints  Int             @default(0) // عتبة الترقية
+  discountPercent    Decimal         @default(0) @db.Decimal(5, 2)
+  extraPointsPercent Decimal         @default(0) @db.Decimal(5, 2) // نقاط إضافية عند الكسب
+  priority           Boolean         @default(false)
+  freeService        Boolean         @default(false)
+  benefits           String? // وصف حر للمزايا
+  isActive           Boolean         @default(true)
+  sortOrder          Int             @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("membership_tier_configs")
+}
+
+/// الكوبونات
+model Coupon {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  description String?
+  type        CouponType @default(PERCENTAGE)
+  value       Decimal    @default(0) @db.Decimal(10, 2) // نسبة أو مبلغ حسب النوع
+  maxDiscount Decimal?   @db.Decimal(10, 2) // سقف الخصم للنسبة
+  minOrder    Decimal    @default(0) @db.Decimal(10, 2)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  usageLimit       Int? // إجمالي مرات الاستخدام (null = بلا حد)
+  usagePerCustomer Int? // مرات لكل عميل
+  usedCount        Int  @default(0)
+
+  // قيود اختيارية - مصفوفات معرّفات/مستويات
+  allowedCategories String[]          @default([])
+  allowedServices   String[]          @default([])
+  allowedCustomers  String[]          @default([])
+  membershipLevels  MembershipLevel[] @default([])
+
+  isActive    Boolean  @default(true)
+  createdById String? // بلا FK - User بلا تعديل
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  redemptions CouponRedemption[]
+
+  @@index([isActive])
+  @@index([type])
+  @@map("coupons")
+}
+
+/// سجل استخدام الكوبونات
+model CouponRedemption {
+  id             String   @id @default(cuid())
+  discountAmount Decimal  @db.Decimal(10, 2)
+  reversed       Boolean  @default(false)
+  orderId        String? // بلا FK - Order بلا تعديل
+  reference      String?
+  createdAt      DateTime @default(now())
+
+  couponId String
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([couponId, createdAt])
+  @@index([customerId])
+  @@index([orderId])
+  @@map("coupon_redemptions")
+}
+
+/// الحملات الترويجية للنقاط (Bonus/Welcome/Birthday/Referral)
+model Campaign {
+  id          String       @id @default(cuid())
+  name        String
+  type        CampaignType @default(BONUS)
+  points      Int          @default(0) // نقاط المكافأة
+  description String?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  membershipLevels MembershipLevel[] @default([]) // استهداف مستويات (فارغ = الكل)
+
+  isActive    Boolean  @default(true)
+  createdById String? // بلا FK
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([type])
+  @@map("campaigns")
+}
+
+// ==================== Phase 9.5 - Employees & Day Closing ====================
+
+/// ملف الموظف - امتداد اختياري 1-1 للمستخدم (بيانات HR + روابط مستندات)
+/// لا يغيّر نموذج User؛ الحقول HR فقط والمستندات كروابط (بلا بنية رفع ملفات)
+model EmployeeProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // بيانات وظيفية
+  employeeCode   String?          @unique // رقم وظيفي اختياري
+  jobTitle       String? // المسمى الوظيفي
+  department     String? // القسم
+  employmentType ContractType     @default(FULL_TIME)
+  status         EmploymentStatus @default(ACTIVE)
+  hireDate       DateTime?
+  terminatedAt   DateTime?
+
+  // بيانات شخصية/تواصل
+  nationalId     String? // رقم الهوية
+  personalPhone  String?
+  personalEmail  String?
+  address        String?
+  emergencyName  String? // جهة اتصال للطوارئ
+  emergencyPhone String?
+
+  // مالية
+  baseSalary Decimal? @db.Decimal(12, 2)
+
+  // روابط مستندات (URLs فقط - لا رفع)
+  contractUrl String?
+  idCardUrl   String?
+  photoUrl    String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Phase 9.6b - علاقات HR (كلها Cascade عند حذف ملف الموظف)
+  attendance       AttendanceRecord[]
+  leaveRequests    LeaveRequest[]
+  leaveBalances    LeaveBalance[]
+  documents        EmployeeDocument[]
+  salaryComponents SalaryComponent[]
+  payslips         Payslip[]
+
+  @@index([status])
+  @@index([department])
+  @@map("employee_profiles")
+}
+
+// ==================== Phase 9.6b - HR Models ====================
+
+/// سجل حضور يومي واحد لكل موظف - clock in/out + استراحة + احتساب التأخير/الإضافي
+model AttendanceRecord {
+  id                String            @id @default(cuid())
+  employeeProfileId String
+  employee          EmployeeProfile   @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  workDate          DateTime          @db.Date
+  clockInAt         DateTime?
+  clockOutAt        DateTime?
+  breakStartedAt    DateTime? // غير null أثناء استراحة جارية
+  breakMinutes      Int               @default(0)
+  workedMinutes     Int               @default(0)
+  lateMinutes       Int               @default(0)
+  overtimeMinutes   Int               @default(0)
+  status            AttendanceStatus  @default(PRESENT)
+  location          String?
+  device            String?
+  ipAddress         String?
+  isManual          Boolean           @default(false) // تصحيح يدوي يحتاج اعتماد
+  approvedById      String? // بلا FK - نفس نمط day-closing
+  approvedAt        DateTime?
+  note              String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([employeeProfileId, workDate])
+  @@index([workDate])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+/// طلب إجازة
+model LeaveRequest {
+  id                String          @id @default(cuid())
+  employeeProfileId String
+  employee          EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  type              LeaveType
+  startDate         DateTime        @db.Date
+  endDate           DateTime        @db.Date
+  days              Int
+  reason            String?
+  status            LeaveStatus     @default(PENDING)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([employeeProfileId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+/// رصيد إجازات سنوي لكل نوع
+model LeaveBalance {
+  id                String          @id @default(cuid())
+  employeeProfileId String
+  employee          EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  type              LeaveType
+  year              Int
+  entitledDays      Int             @default(0)
+  usedDays          Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([employeeProfileId, type, year])
+  @@map("leave_balances")
+}
+
+/// مستند موظف (عقد/هوية/جواز/شهادة) مع تاريخ انتهاء لتنبيهات الصلاحية
+model EmployeeDocument {
+  id                String               @id @default(cuid())
+  employeeProfileId String
+  employee          EmployeeProfile      @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  type              EmployeeDocumentType
+  name              String
+  number            String?
+  url               String?
+  issueDate         DateTime?
+  expiryDate        DateTime?
+  note              String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([employeeProfileId])
+  @@index([expiryDate])
+  @@map("employee_documents")
+}
+
+/// مكوّن راتب متكرر (بدل/خصم/مكافأة ثابتة)
+model SalaryComponent {
+  id                String              @id @default(cuid())
+  employeeProfileId String
+  employee          EmployeeProfile     @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  type              SalaryComponentType
+  label             String
+  amount            Decimal             @db.Decimal(12, 2)
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([employeeProfileId])
+  @@map("salary_components")
+}
+
+/// دورة رواتب لفترة (شهر) - تحوي قسائم لكل موظف نشط
+model PayrollRun {
+  id              String        @id @default(cuid())
+  periodStart     DateTime      @db.Date
+  periodEnd       DateTime      @db.Date
+  label           String
+  status          PayrollStatus @default(DRAFT)
+  totalGross      Decimal       @default(0) @db.Decimal(14, 2)
+  totalDeductions Decimal       @default(0) @db.Decimal(14, 2)
+  totalNet        Decimal       @default(0) @db.Decimal(14, 2)
+  generatedById   String?
+  approvedById    String?
+  approvedAt      DateTime?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  payslips Payslip[]
+
+  @@unique([periodStart, periodEnd])
+  @@index([status])
+  @@map("payroll_runs")
+}
+
+/// قسيمة راتب موظف ضمن دورة - أرقام لقطة وقت التوليد
+model Payslip {
+  id                String          @id @default(cuid())
+  payrollRunId      String
+  run               PayrollRun      @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeProfileId String
+  employee          EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  baseSalary        Decimal         @db.Decimal(12, 2)
+  allowances        Decimal         @default(0) @db.Decimal(12, 2)
+  bonuses           Decimal         @default(0) @db.Decimal(12, 2)
+  overtimePay       Decimal         @default(0) @db.Decimal(12, 2)
+  deductions        Decimal         @default(0) @db.Decimal(12, 2)
+  netSalary         Decimal         @db.Decimal(12, 2)
+  workedDays        Int             @default(0)
+  absentDays        Int             @default(0)
+  leaveDays         Int             @default(0)
+  overtimeHours     Decimal         @default(0) @db.Decimal(8, 2)
+  note              String?
+  createdAt         DateTime        @default(now())
+
+  @@unique([payrollRunId, employeeProfileId])
+  @@index([employeeProfileId])
+  @@map("payslips")
+}
+
+// ==================== Phase 9.6c - Per-user Permission Overrides ====================
+
+/// تجاوز صلاحية لمستخدم بعينه فوق دوره الثابت (granted=منح إضافي، false=سحب).
+/// طبقة إضافية لا تمسّ UserRole enum ولا ROLE_PERMISSIONS - المصدر يبقى الدور،
+/// وهذه تعديلات دقيقة تُدمج وقت فحص الصلاحية (راجع permission.middleware).
+model UserPermissionOverride {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission  String
+  granted     Boolean // true=منح إضافي فوق الدور، false=سحب من الدور
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, permission])
+  @@index([userId])
+  @@map("user_permission_overrides")
+}
+
+/// إغلاق اليوم المحاسبي - يوم عمل واحد لكل فرع (نمط Odoo/SAP)
+/// snapshot يخزّن كل التجميعات وقت الإغلاق؛ الحقول النقدية للدرج؛ actor ids نصّية بلا FK
+model DayClosing {
+  id           String    @id @default(cuid())
+  branchId     String?
+  businessDate DateTime  @db.Date // يوم العمل (تاريخ فقط)
+  status       DayStatus @default(OPEN)
+
+  // درج النقدية
+  openingCash    Decimal  @default(0) @db.Decimal(12, 2) // رصيد افتتاحي
+  cashIn         Decimal  @default(0) @db.Decimal(12, 2) // إيداعات نقدية يدوية
+  cashOut        Decimal  @default(0) @db.Decimal(12, 2) // مسحوبات/مصروفات نقدية
+  expectedCash   Decimal  @default(0) @db.Decimal(12, 2) // المتوقع = افتتاحي + مبيعات نقدية + إيداع - سحب
+  actualCash     Decimal? @db.Decimal(12, 2) // المعدود فعلياً عند الإغلاق
+  cashDifference Decimal? @db.Decimal(12, 2) // فرق = فعلي - متوقع
+  differenceNote String? // سبب الفرق
+
+  // لقطة التجميعات وقت الإغلاق (طلبات/إيرادات/مدفوعات/خصومات/ضريبة/مرتجعات/عملاء/نقاط/كوبونات/مخزون/صحة)
+  snapshot Json?
+
+  // سير العمل
+  openedAt   DateTime  @default(now())
+  openedById String?
+  closedAt   DateTime?
+  closedById String?
+  reopenedAt DateTime?
+  reopenedById String?
+  reopenReason String?
+  approvedAt DateTime?
+  approvedById String?
+  lockedAt   DateTime? // بعد الإغلاق تُقفل التعديلات على فترة اليوم
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, businessDate])
+  @@index([status])
+  @@index([businessDate])
+  @@map("day_closings")
+}
