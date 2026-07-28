@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+  schedule:
+    # Nightly regression run — 03:00 UTC
+    - cron: "0 3 * * *"
+
+# Cancel superseded runs on the same ref (saves CI minutes)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # يُرضي مُتحقّق config/env.ts أثناء typecheck/build/tests بلا أسرار حقيقية
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/laundry_ci"
+  JWT_ACCESS_SECRET: "ci-access-secret-at-least-32-characters-long"
+  JWT_REFRESH_SECRET: "ci-refresh-secret-at-least-32-characters-long"
+
+jobs:
+  # ==================== Backend (API) ====================
+  api:
+    name: API (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter @laundry/api exec prisma generate
+
+      - name: TypeScript
+        run: pnpm --filter @laundry/api typecheck
+
+      - name: Unit tests + coverage
+        run: pnpm --filter @laundry/api test:coverage
+
+      - name: Build
+        run: pnpm --filter @laundry/api build
+
+      - name: Upload API coverage
+        if: matrix.node == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ==================== Frontend (Admin) ====================
+  admin:
+    name: Admin (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate (types shared via @prisma/client)
+        run: pnpm --filter @laundry/api exec prisma generate
+
+      - name: TypeScript
+        run: pnpm --filter @laundry/admin type-check
+
+      - name: ESLint
+        run: pnpm --filter @laundry/admin lint
+
+      - name: Unit tests + coverage
+        run: pnpm --filter @laundry/admin test:coverage
+
+      - name: Build
+        run: pnpm --filter @laundry/admin build
+
+      - name: Upload Admin coverage
+        if: matrix.node == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-coverage
+          path: apps/admin/coverage
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ==================== Quality Gate ====================
+  # فحص تجميعي واحد يُشترط في حماية الفرع: يفشل إن فشل أي job أعلاه.
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [api, admin]
+    if: always()
+    steps:
+      - name: Verify all checks passed
+        run: |
+          if [ "${{ needs.api.result }}" != "success" ] || [ "${{ needs.admin.result }}" != "success" ]; then
+            echo "❌ One or more required checks failed."
+            exit 1
+          fi
+          echo "✅ All checks passed — merge allowed."
