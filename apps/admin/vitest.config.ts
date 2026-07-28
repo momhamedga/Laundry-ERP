@@ -24,7 +24,15 @@ export default defineConfig({
       // طبقة الوحدات تقيس منطق العرض/الأدوات النقيّة (lib/constants). المكوّنات
       // التفاعلية والصفحات تُغطَّى باختبار العرض (jsdom) واختبار التكامل الحيّ،
       // فلا تُدرَج في مقام تغطية الوحدات (فصل قياسي بين الطبقات).
-      include: ["src/lib/format.ts", "src/constants/permissions.ts"],
+      include: [
+        "src/lib/format.ts",
+        "src/lib/utils.ts",
+        "src/constants/permissions.ts",
+        "src/components/hr/hr-format.ts",
+        "src/components/day-closing/day-format.ts",
+        "src/components/admin/admin-format.ts",
+        "src/components/employees/employee-format.ts",
+      ],
       exclude: ["src/**/*.d.ts"],
     },
   },
