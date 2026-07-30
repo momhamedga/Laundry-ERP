@@ -21,9 +21,13 @@ async function withDbRetry<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
     } catch (err) {
       lastErr = err;
       const msg = err instanceof Error ? err.message : String(err);
-      const transient = /reach database server|P1001|Timed out|Connection|ECONNRESET/i.test(msg);
+      // P1001/الاتصال: برود Neon. 40P01/deadlock: كتابة إشعار fire-and-forget من
+      // اختبار سابق (bus.emit غير مُنتظَر بالتصميم) تتسابق مع TRUNCATE على القفل
+      // الحصري - Postgres يُجهض أحد الطرفين، فإعادة المحاولة تنجح بعد أن تُصرَّف.
+      const transient =
+        /reach database server|P1001|Timed out|Connection|ECONNRESET|deadlock|40P01/i.test(msg);
       if (!transient) throw err;
-      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
     }
   }
   throw lastErr;

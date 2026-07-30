@@ -28,9 +28,11 @@ export default defineConfig({
     // شبكة حقيقية إلى Neon: مهل أوسع من الوحدات
     testTimeout: 30_000,
     hookTimeout: 120_000,
-    // عملية واحدة تسلسلية - عزل بيانات موثوق عبر السويتات على schema مشترك
+    // عامل واحد تسلسلي - عزل بيانات موثوق عبر السويتات على schema مشترك،
+    // وأقل عدد اتصالات إلى Neon (Vitest 4: خيارات المجمّع على المستوى الأعلى).
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    minWorkers: 1,
     fileParallelism: false,
     env: {
       NODE_ENV: "test",

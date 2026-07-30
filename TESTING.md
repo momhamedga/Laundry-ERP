@@ -9,15 +9,38 @@
 |---|---|---|---|
 | **Unit (API)** | Vitest (Node) | ✅ نعم | منطق الأعمال/التحقّق/الأدوات النقيّة — بلا قاعدة بيانات أو شبكة |
 | **Unit (Admin)** | Vitest + jsdom + Testing Library | ✅ نعم | أدوات العرض، مرآة الصلاحيات، وعرض مكوّن (component render) |
-| **Integration (حيّ)** | سكربتات HTTP مقابل الـ API الحقيقي + Neon Postgres | ⚠️ يدوي | التدفّق الكامل عبر الوحدات (Orders→Payments→Invoices→…→Day Closing) |
-| **Regression / Security / Performance** | نفس منهج الـ HTTP الحيّ | ⚠️ يدوي | منع الكسر، RBAC/الانتحال/التجاوزات، أحجام كبيرة |
+| **Integration (API)** | Vitest + supertest + Prisma + Postgres حقيقي (Neon، schema معزول) | ⚙️ عند توفّر DB | التدفّق الكامل عبر HTTP الحقيقي: Controllers→Services→Repositories→DB، RBAC/تجاوزات/انتحال/جلسات، معاملات وسلامة تحت التزامن، إغلاق اليوم وقفل الفترة |
 
-### لماذا التكامل "حيّ" وليس آلياً في CI؟
-اختبارات التكامل الحقيقية تتطلّب Postgres مُهيّأة (Neon). حِفاظاً على حتمية بوّابة CI
-(بلا اعتماد على قاعدة خارجية)، **طبقة الوحدات فقط** هي بوّابة الدمج. طبقة التكامل
-تُشغَّل يدويّاً/مجدولةً مقابل قاعدة حقيقية (وقد شُغِّلت خضراء في نهاية كل مرحلة بناء).
-لتفعيلها آلياً مستقبلاً: أضِف خدمة `postgres` إلى مصفوفة CI + `prisma migrate deploy`
-ثم شغّل مجموعة التكامل — انظر "المتبقّي" أدناه.
+### طبقة التكامل (Phase 10.6) — حقيقية ومعزولة
+**16 ملف اختبار · 164 اختباراً · كلها خضراء.** تعمل مقابل **PostgreSQL حقيقي** داخل
+schema مستقل اسمه `integration_test` على نفس مثيل Neon، فلا تلمس بيانات التطوير في
+`public` إطلاقاً. لا Mock — HTTP حقيقي عبر `supertest` على `createApp()`، وPrisma
+حقيقي، ومعاملات حقيقية. تغطية الطبقة (نطاق الخادم الكامل: controllers/routes/
+repositories/services/middlewares): **53% عبارات / 56% أسطر** — مقيسة فعلياً.
+
+```bash
+pnpm --filter @laundry/api test:integration            # يتطلّب apps/api/.env بـDATABASE_URL صالح
+pnpm --filter @laundry/api test:integration:coverage   # مع قياس التغطية
+DROP_TEST_SCHEMA=1 pnpm --filter @laundry/api test:integration   # تنظيف: إسقاط الschema بعد التشغيل
+```
+
+**كيف تعمل:** `vitest.integration.config.ts` يشتقّ رابط الاختبار من `.env` وقت التحميل
+(مضيف مباشر + `schema=integration_test`)، و`globalSetup` يطبّق `prisma migrate deploy`
+(idempotent)، وكل اختبار يبدأ بـ`TRUNCATE` لكل الجداول (عزل تامّ). التنفيذ تسلسلي
+بعامل واحد لتقليل اتصالات Neon. مهلة المعاملة تُرفَع في `NODE_ENV=test` فقط (زمن شبكة
+Neon البعيد) دون أي تأثير على الإنتاج.
+
+### لماذا ليست بوّابة CI افتراضية؟
+تتطلّب Postgres مُهيّأة. بوّابة الدمج الحتمية تبقى **طبقة الوحدات**. لتفعيل التكامل في
+CI: أضِف خدمة `postgres` (أو سرّ `DATABASE_URL` لفرع Neon) ثم `pnpm --filter @laundry/api
+test:integration` — الإعداد جاهز، لا يحتاج سوى قاعدة في البيئة.
+
+### نتيجة تكامل موثّقة (سلامة تحت التزامن)
+كشف اختبار التزامن أن توليد رقم الطلب التسلسلي (`sequence = آخر رقم + 1`) يتسابق تحت
+الإنشاء المتوازي: بعض الطلبات المتزامنة قد تفشل بـ500 عند تصادم قيد `orderNumber`
+الفريد (P2002). **سلامة البيانات محفوظة دائماً** — لا يُخزَّن رقم مكرّر إطلاقاً (القيد
+الفريد يحمي التكامل). توصية مستقبلية (خارج نطاق 10.6، تجنّباً لتغيير المنطق): تسلسل
+الترقيم عبر advisory lock أو إعادة محاولة عند P2002.
 
 ## التشغيل محليّاً
 

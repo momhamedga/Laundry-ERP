@@ -55,13 +55,29 @@ interface CreateUserOpts {
   branchId?: string | null;
 }
 
+/**
+ * تُخزَّن تجزئة كلمة المرور الافتراضية مرة واحدة (bcrypt cost 12 مكلف ~250ms).
+ * إعادة استخدامها لكل المستخدمين المزروعين يقلّص زمن السويت بشكل كبير دون التأثير
+ * على واقعية تسجيل الدخول (bcrypt.compare حقيقي عند كل login).
+ */
+let cachedDefaultHash: string | null = null;
+async function defaultPasswordHash(): Promise<string> {
+  cachedDefaultHash ??= await hashPassword(TEST_PASSWORD);
+  return cachedDefaultHash;
+}
+
 /** يزرع مستخدماً مباشرةً في قاعدة الاختبار (تجاوز مسار الإنشاء المحمي بالأدمن). */
 export async function createUser(opts: CreateUserOpts) {
-  const passwordHash = await hashPassword(opts.password ?? TEST_PASSWORD);
+  const passwordHash =
+    opts.password && opts.password !== TEST_PASSWORD
+      ? await hashPassword(opts.password)
+      : await defaultPasswordHash();
+  // البريد يُطبَّع lowercase ليطابق تطبيع تسجيل الدخول (loginSchema.toLowerCase)
+  const email = opts.email.toLowerCase();
   return prisma.user.create({
     data: {
-      email: opts.email,
-      name: opts.name ?? opts.email,
+      email,
+      name: opts.name ?? email,
       role: opts.role,
       passwordHash,
       isActive: opts.isActive ?? true,
