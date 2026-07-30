@@ -126,9 +126,13 @@ export class OrdersRepository {
   // ==================== Create (Atomic) ====================
 
   /**
-   * إنشاء الطلب + عناصره + أول سجل حالة في Transaction واحدة
-   * توليد الرقم داخل الـ transaction مع إعادة محاولة عند التصادم
-   * (القيد الفريد على orderNumber هو خط الدفاع الأخير)
+   * إنشاء الطلب + عناصره + أول سجل حالة في Transaction واحدة.
+   *
+   * تخصيص الرقم مؤمَّن ضد التزامن عبر قفل استشاري على مستوى المعاملة
+   * (pg_advisory_xact_lock) يُسلسِل قسم "اقرأ الأخير + 1 + أدرِج" لكل سنة، فيمنع
+   * تصادم القيد الفريد نهائياً تحت الضغط - لا Race، لا Lost Update، لا فشل طلب.
+   * القفل يُحرَّر تلقائياً بنهاية المعاملة (commit/rollback). حلقة إعادة المحاولة
+   * تبقى خط دفاع أخير (القيد الفريد على orderNumber). لا يتغيّر شكل الرقم ولا أي API.
    */
   async createOrderWithItems(data: CreateOrderData): Promise<OrderDetail> {
     const year = data.receivedAt.getFullYear();
@@ -137,6 +141,9 @@ export class OrdersRepository {
     for (let attempt = 1; attempt <= ORDER_NUMBER_MAX_RETRIES; attempt++) {
       try {
         return await this.db.$transaction(async (tx) => {
+          // تسلسل تخصيص الرقم لهذه السنة عبر قفل استشاري (يُحرَّر بنهاية المعاملة)
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('order_number')::int, ${year}::int)`;
+
           const last = await tx.order.findFirst({
             where: { orderNumber: { startsWith: prefix } },
             orderBy: { orderNumber: "desc" },

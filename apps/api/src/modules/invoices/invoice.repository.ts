@@ -133,6 +133,10 @@ export class InvoicesRepository {
     for (let attempt = 1; attempt <= INVOICE_NUMBER_MAX_RETRIES; attempt++) {
       try {
         return await this.db.$transaction(async (tx) => {
+          // تسلسل تخصيص رقم الفاتورة لهذه السنة عبر قفل استشاري (يُحرَّر بنهاية
+          // المعاملة): يمنع تصادم القيد الفريد تحت التزامن نهائياً - نفس نمط orders.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('invoice_number')::int, ${year}::int)`;
+
           const last = await tx.invoice.findFirst({
             where: { invoiceNumber: { startsWith: prefix } },
             orderBy: { invoiceNumber: "desc" },

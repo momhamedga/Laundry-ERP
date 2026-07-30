@@ -23,11 +23,9 @@ describe("concurrency + security (integration)", () => {
   });
 
   describe("moderate concurrency", () => {
-    // نتيجة تكامل حقيقية موثّقة: توليد رقم الطلب التسلسلي (sequence = last + 1)
-    // يتسابق تحت التزامن؛ قد تفشل بعض الطلبات المتزامنة بـ500 عند تصادم قيد
-    // orderNumber الفريد (P2002). الثابت الأهمّ (سلامة البيانات) محفوظ دائماً:
-    // لا يُخزَّن أبداً رقم طلب مكرّر، وعدد المخزَّن = عدد الطلبات الناجحة بالضبط.
-    it("preserves integrity under 12 concurrent creates (no duplicate order numbers ever persist)", async () => {
+    // بعد إصلاح القفل الاستشاري (Phase 10.7): تخصيص الرقم مُسلسَل، فكل الطلبات
+    // المتزامنة تنجح (بلا 500) بأرقام فريدة متتابعة - لا Race، لا تصادم، لا أشباح.
+    it("creates 12 concurrent orders — all succeed with unique, collision-free numbers", async () => {
       const branchId = (await seedBranch()).id;
       const customerId = (await createCustomer(app, adminToken)).id;
       const serviceId = (await createService(app, adminToken, { price: 10 })).id;
@@ -46,16 +44,15 @@ describe("concurrency + security (integration)", () => {
           });
 
       const results = await Promise.all(Array.from({ length: 12 }, makeOrder));
-      const succeeded = results.filter((r) => r.status === 201);
-      // على الأقل بعضها ينجح (النظام لا يتعطّل بالكامل تحت التزامن)
-      expect(succeeded.length).toBeGreaterThanOrEqual(1);
+      // كلها تنجح - لا فشل تحت التزامن بعد التسلسل عبر القفل الاستشاري
+      expect(results.every((r) => r.status === 201)).toBe(true);
 
-      // الثابت الحرج: كل الأرقام المُصدَرة فريدة، ولا تكرار في القاعدة إطلاقاً
-      const numbers = succeeded.map((r) => r.body.data.order.orderNumber);
-      expect(new Set(numbers).size).toBe(numbers.length);
+      // كل الأرقام فريدة، والقاعدة تحوي 12 طلباً بالضبط بلا تكرار
+      const numbers = results.map((r) => r.body.data.order.orderNumber);
+      expect(new Set(numbers).size).toBe(12);
       const persisted = await prisma.order.findMany({ select: { orderNumber: true } });
-      expect(new Set(persisted.map((o) => o.orderNumber)).size).toBe(persisted.length);
-      expect(persisted.length).toBe(succeeded.length); // القاعدة = النجاحات بالضبط (لا أشباح)
+      expect(persisted.length).toBe(12);
+      expect(new Set(persisted.map((o) => o.orderNumber)).size).toBe(12);
     });
 
     it("creates 10 customers in parallel with unique phones", async () => {

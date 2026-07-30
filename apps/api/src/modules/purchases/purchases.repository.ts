@@ -78,6 +78,10 @@ export class PurchasesRepository {
     for (let attempt = 1; attempt <= PURCHASE_NUMBER_MAX_RETRIES; attempt++) {
       try {
         return await this.db.$transaction(async (tx) => {
+          // تسلسل تخصيص رقم أمر الشراء لهذه السنة عبر قفل استشاري (يُحرَّر بنهاية
+          // المعاملة): يمنع تصادم القيد الفريد تحت التزامن نهائياً - نفس نمط orders.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('purchase_number')::int, ${year}::int)`;
+
           const last = await tx.purchase.findFirst({
             where: { purchaseNumber: { startsWith: prefix } },
             orderBy: { purchaseNumber: "desc" },
