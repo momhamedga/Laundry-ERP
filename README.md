@@ -1,41 +1,86 @@
-# Laundry ERP — نظام إدارة المغاسل الاحترافي
+# Laundry ERP — Enterprise Edition
 
-نظام Enterprise لإدارة المغاسل يعمل عبر Desktop / Web / Android / iPhone على قاعدة بيانات واحدة.
+A production-grade ERP for laundry / dry-cleaning businesses: a web admin dashboard
+backed by an enterprise API, plus a Windows desktop application that works **fully
+offline** and **auto-syncs** when connectivity returns.
 
-## هيكل المشروع (Monorepo)
+**Current release:** v1.3.0 · **Repository:** https://github.com/momhamedga/Laundry-ERP
+
+---
+
+## What's included
+
+| Layer | Stack | Purpose |
+|---|---|---|
+| **API** (`apps/api`) | Express 5 · Prisma 6 · PostgreSQL (Neon) | Business logic, auth (JWT), RBAC, all modules |
+| **Admin** (`apps/admin`) | Next.js 16 · React 19 · Tailwind | Web dashboard (orders, customers, payments, reports, HR, settings) |
+| **Desktop** (`apps/desktop`) | Electron 33 · better-sqlite3 (SQLCipher) | Offline-first Windows app that reuses the Admin UI + API |
+
+## Core capabilities
+
+- **Modules:** customers, orders (+ items, statuses), payments, invoices, services &
+  categories, inventory, suppliers, purchases, branches, employees/HR, coupons,
+  loyalty, membership, day-closing, reports, notifications, settings, admin.
+- **Desktop offline platform:** local encrypted SQLite, offline create/read/update,
+  background sync engine, conflict resolution, dead-letter queue, auto-backup +
+  restore, barcode/label generation, camera capture, USB-scanner input, printing,
+  tray, multi-window, crash reporter, auto-update.
+- **Security:** JWT with refresh rotation, RBAC, contextIsolation + sandbox on all
+  Electron windows, CSP, SQLite encrypted at rest with an OS-keystore-sealed key.
+
+## Repository layout
 
 ```
-laundry-erp/
-├── apps/
-│   └── api/          # Backend REST API (Express + Prisma + PostgreSQL)
-├── packages/         # الحزم المشتركة
-├── pnpm-workspace.yaml
-└── package.json
+apps/
+  api/       Express + Prisma API          (prisma/schema.prisma, prisma/seed*.ts)
+  admin/     Next.js admin dashboard
+  desktop/   Electron desktop app          (src/main, src/preload, src/shared)
+docs/        Documentation (this set)
+CHANGELOG.md · LICENSE.md · CONTRIBUTING.md · CODE_OF_CONDUCT.md · PRODUCTION_CHECKLIST.md
 ```
 
-## المتطلبات
-
-- Node.js >= 20
-- pnpm >= 9
-- قاعدة بيانات PostgreSQL (Neon)
-
-## التشغيل السريع
+## Quick start (development)
 
 ```bash
-# 1) تثبيت الاعتماديات
 pnpm install
-
-# 2) إعداد المتغيرات البيئية
-# انسخ apps/api/.env.example إلى apps/api/.env وضع رابط قاعدة البيانات
-
-# 3) توليد Prisma Client
-pnpm db:generate
-
-# 4) تنفيذ الهجرات على قاعدة البيانات
-pnpm db:migrate
-
-# 5) تشغيل الـ API
-pnpm api:dev
+# API — configure apps/api/.env (DATABASE_URL, JWT secrets), then:
+pnpm --filter @laundry/api exec prisma migrate deploy
+pnpm --filter @laundry/api exec tsx prisma/seed.ts    # admin user
+pnpm --filter @laundry/api dev                        # http://127.0.0.1:4000
+pnpm --filter @laundry/admin dev                      # http://localhost:3000
+pnpm --filter @laundry/desktop dev                    # Electron shell
 ```
 
-ثم افتح: http://localhost:4000/api/v1/health
+Default admin (change immediately): `admin@laundry.local` / `Admin@12345`.
+Demo dataset (against a demo DB): `pnpm --filter @laundry/api exec tsx prisma/seed-demo.ts`.
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [INSTALL](docs/INSTALL.md) | Prerequisites, install, build |
+| [DEPLOYMENT](docs/DEPLOYMENT.md) | API + Admin + Desktop deployment |
+| [USER_GUIDE](docs/USER_GUIDE.md) | Day-to-day operator guide |
+| [ADMIN_GUIDE](docs/ADMIN_GUIDE.md) | Administration & configuration |
+| [OFFLINE_MODE](docs/OFFLINE_MODE.md) | How offline works |
+| [SYNC_ENGINE](docs/SYNC_ENGINE.md) | Sync + conflict resolution internals |
+| [BACKUP_AND_RESTORE](docs/BACKUP_AND_RESTORE.md) | Backups & recovery |
+| [SECURITY](docs/SECURITY.md) | Security model & posture |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | System design |
+| [API_DOCUMENTATION](docs/API_DOCUMENTATION.md) | REST endpoints |
+| [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | Common issues |
+| [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) | Go-live checklist |
+| [WINDOWS_QA_CHECKLIST](docs/WINDOWS_QA_CHECKLIST.md) | Desktop QA matrix |
+| [ROADMAP](docs/ROADMAP.md) | Version history, limitations, future |
+
+## Known limitations (honest)
+
+- The Windows installer (NSIS/portable) is **not built in the current CI/build
+  environment** (winCodeSign/electron-unpack stalls); the unpacked app builds and
+  runs. See [ROADMAP](docs/ROADMAP.md).
+- Hardware features (thermal/label printer, USB scanner, cash drawer, live camera)
+  require **on-site verification** with the actual devices.
+
+## License
+
+Proprietary — see [LICENSE.md](LICENSE.md).

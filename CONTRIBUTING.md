@@ -23,9 +23,13 @@ pnpm admin:dev    # الواجهة على :3000
 ```
 apps/api      Express 5 + Prisma 6 + Neon Postgres (REST API)
 apps/admin    Next.js 16 + React 19 + TanStack Query (لوحة الإدارة)
+apps/desktop  Electron 33 + better-sqlite3 (SQLCipher) — تطبيق سطح المكتب Offline-first
+docs/         التوثيق
 ```
 كل وحدة API تتبع: `Repository → Service → Controller → Router` مع Composition Root
-في `index.ts`. لا تكسر هذا النمط.
+في `index.ts`. لا تكسر هذا النمط. على سطح المكتب: `main/` (العمليات) + `preload/`
+(جسر contextBridge الوحيد) + `shared/ipc.ts` (عقد القنوات). كل كتابة أوفلاين تُلتقط
+في `sync_queue` ولا تغيّر أي عقد سيرفر.
 
 ## فروع العمل
 - `main` — إنتاجي، محميّ (لا دفع مباشر).
@@ -52,6 +56,11 @@ pnpm --filter @laundry/admin type-check
 pnpm --filter @laundry/admin lint
 pnpm --filter @laundry/admin test
 pnpm --filter @laundry/admin build
+
+# Desktop
+pnpm --filter @laundry/desktop exec tsc --noEmit -p tsconfig.json
+pnpm --filter @laundry/desktop exec eslint "src/**/*.ts"
+pnpm --filter @laundry/desktop build
 ```
 كلها يجب أن تكون خضراء — نفس ما تُشغّله CI.
 
