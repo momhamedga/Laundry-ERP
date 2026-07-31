@@ -17,6 +17,8 @@ import { backupOnExitIfEnabled, runBackup, startBackupSchedules, stopBackupSched
 import { registerShortcuts } from "./services/shortcuts.js";
 import { closeAllExtraWindows, openWindow, setRendererBase } from "./windows/windows-manager.js";
 import { closeDatabase, dbStatus, initDatabase } from "./db/database.js";
+import { syncEngine } from "./services/sync-engine.js";
+import { getSettings } from "./services/settings.js";
 import { registerIpc } from "./ipc/index.js";
 import { EVENT_CHANNELS } from "../shared/ipc.js";
 
@@ -157,6 +159,11 @@ async function onReady(): Promise<void> {
   initUpdater();
   registerIpc({ backend, network });
 
+  // Phase 11.6C: بثّ حالة المزامنة للواجهة + بدء المزامنة الدورية إن كانت مُفعّلة
+  syncEngine.on("status", (s) => win.webContents.send(EVENT_CHANNELS.SYNC_STATUS, s));
+  const syncCfg = getSettings().sync;
+  if (syncCfg.enabled) syncEngine.startAuto(syncCfg.intervalSec);
+
   // اختصارات لوحة المفاتيح (تبثّ إجراءات للواجهة الفعّالة)
   registerShortcuts((action) => {
     const focused = BrowserWindow.getFocusedWindow() ?? win;
@@ -178,7 +185,10 @@ async function onReady(): Promise<void> {
     win.webContents.send(EVENT_CHANNELS.NET_STATUS_CHANGED, s);
     refreshTray(); // حدّث تسمية "المزامنة" في قائمة الـ tray
     if (s === "offline") notify("غير متصل", "فُقد الاتصال بالخادم المحلي. جارٍ إعادة المحاولة…");
-    if (s === "online") notifyEvent("sync-completed", "عاد الاتصال بالخادم.");
+    if (s === "online") {
+      notifyEvent("sync-completed", "عاد الاتصال بالخادم.");
+      void syncEngine.syncNow("online"); // Phase 11.6C: استنزاف الطابور فور عودة الاتصال
+    }
   });
 
   log.info("desktop ready");
@@ -193,6 +203,7 @@ async function cleanup(): Promise<void> {
   stopBackupSchedules();
   closeAllExtraWindows();
   network.stop();
+  syncEngine.stopAuto(); // إيقاف المزامنة الدورية
   destroyTray();
   closeDatabase(); // إغلاق SQLite نظيفاً
   await Promise.allSettled([backend.stop(), renderer.stop()]);

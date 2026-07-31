@@ -177,6 +177,17 @@ CREATE TABLE IF NOT EXISTS cached_branches (
   is_active  INTEGER,
   cached_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ==================== خريطة المعرّفات (Phase 11.6C) ====================
+-- تربط المعرّف المحلّي (local_*) بمعرّف السيرفر بعد نجاح المزامنة، لتعتمد عليها
+-- العمليات التابعة (طلب يشير لعميل أُنشئ أوفلاين، دفعة تشير لطلب … إلخ).
+CREATE TABLE IF NOT EXISTS id_map (
+  entity     TEXT NOT NULL,             -- customer|order|payment
+  local_id   TEXT NOT NULL,
+  server_id  TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (entity, local_id)
+);
 `;
 
 export const OFFLINE_TABLES = [

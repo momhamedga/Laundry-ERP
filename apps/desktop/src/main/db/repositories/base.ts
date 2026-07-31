@@ -26,3 +26,10 @@ export function nowIso(): string {
 export function bit(v: boolean | undefined, fallback = false): 0 | 1 {
   return (v ?? fallback) ? 1 : 0;
 }
+
+/** يعلّم صفّاً محلّياً بأنه تمّت مزامنته (يزيل _dirty ويضبط _synced_at) — Phase 11.6C. */
+export function markSynced(table: "customers" | "orders" | "payments", id: string): void {
+  getDb()
+    .prepare(`UPDATE ${table} SET _dirty = 0, _synced_at = datetime('now') WHERE id = ?`)
+    .run(id);
+}

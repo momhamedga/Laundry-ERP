@@ -54,6 +54,11 @@ export const INVOKE_CHANNELS = {
   OFFLINE_CACHE_PUT: "offline:cache:put",
   OFFLINE_QUEUE_LIST: "offline:queue:list",
 
+  // Phase 11.6C — Sync Engine
+  OFFLINE_SYNC_SET_AUTH: "offline:sync:set-auth",
+  OFFLINE_SYNC_NOW: "offline:sync:now",
+  OFFLINE_SYNC_STATE: "offline:sync:state",
+
   DIALOG_OPEN_FILE: "dialog:open-file",
   DIALOG_SAVE_FILE: "dialog:save-file",
 
@@ -80,6 +85,7 @@ export const EVENT_CHANNELS = {
   NAVIGATE: "app:navigate",
   SHORTCUT: "app:shortcut",
   BACKUP_DONE: "backup:done",
+  SYNC_STATUS: "offline:sync:status",
 } as const;
 
 /** مفاتيح التخزين المسموح بها للـ renderer (للرسائل التشخيصية) */
@@ -360,6 +366,25 @@ export interface SyncQueueItem {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** نتيجة تشغيل مزامنة واحد (Phase 11.6C) */
+export interface SyncResult {
+  processed: number;
+  done: number;
+  failed: number;
+  retried: number;
+  skipped?: boolean;
+  reason?: string;
+}
+
+/** حالة محرّك المزامنة (Phase 11.6C) */
+export interface SyncState {
+  running: boolean;
+  authed: boolean;
+  pending: number;
+  lastRunAt: string | null;
+  lastResult: SyncResult | null;
 }
 
 /** كيانات الكاش للقراءة (تُملأ من السيرفر عند الاتصال) */

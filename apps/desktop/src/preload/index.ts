@@ -25,6 +25,8 @@ import {
   type OfflineDbStatus,
   type OpenFileOptions,
   type SyncQueueItem,
+  type SyncResult,
+  type SyncState,
   type PdfExportOptions,
   type PrinterInfo,
   type RawPrintOptions,
@@ -130,6 +132,12 @@ const api = {
       list: (limit?: number) =>
         invoke<SyncQueueItem[]>(INVOKE_CHANNELS.OFFLINE_QUEUE_LIST, { limit }),
     },
+    sync: {
+      setAuth: (token: string | null) =>
+        invoke<SyncState>(INVOKE_CHANNELS.OFFLINE_SYNC_SET_AUTH, { token }),
+      now: () => invoke<SyncResult>(INVOKE_CHANNELS.OFFLINE_SYNC_NOW),
+      state: () => invoke<SyncState>(INVOKE_CHANNELS.OFFLINE_SYNC_STATE),
+    },
   },
   dialog: {
     openFile: (opts?: OpenFileOptions) => invoke<string[]>(INVOKE_CHANNELS.DIALOG_OPEN_FILE, opts),
@@ -158,6 +166,7 @@ const api = {
     navigate: (cb: (route: string) => void) => subscribe<string>(EVENT_CHANNELS.NAVIGATE, cb),
     shortcut: (cb: (action: string) => void) => subscribe<string>(EVENT_CHANNELS.SHORTCUT, cb),
     backupDone: (cb: (e: BackupEntry) => void) => subscribe<BackupEntry>(EVENT_CHANNELS.BACKUP_DONE, cb),
+    syncStatus: (cb: (s: SyncState) => void) => subscribe<SyncState>(EVENT_CHANNELS.SYNC_STATUS, cb),
   },
 } as const;
 

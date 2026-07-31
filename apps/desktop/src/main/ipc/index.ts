@@ -16,6 +16,7 @@ import { getSettings, updateSettings } from "../services/settings.js";
 import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
 import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
+import { syncEngine } from "../services/sync-engine.js";
 import { dbStatus } from "../db/database.js";
 import {
   createCustomer,
@@ -297,6 +298,16 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
     const o = (p ?? {}) as { limit?: number };
     return listQueue(typeof o.limit === "number" ? o.limit : 200);
   });
+
+  // ==================== Sync Engine (Phase 11.6C) ====================
+  handle(INVOKE_CHANNELS.OFFLINE_SYNC_SET_AUTH, (_e, p) => {
+    const o = assertObject(p);
+    const token = o.token;
+    syncEngine.setAuth(token === null || typeof token === "string" ? (token as string | null) : null);
+    return syncEngine.getState();
+  });
+  handle(INVOKE_CHANNELS.OFFLINE_SYNC_NOW, () => syncEngine.syncNow("manual"));
+  handle(INVOKE_CHANNELS.OFFLINE_SYNC_STATE, () => syncEngine.getState());
 
   // ==================== One-way (renderer → main) ====================
   ipcMain.on(SEND_CHANNELS.LOG_RENDERER, (_e, level: unknown, message: unknown) => {
