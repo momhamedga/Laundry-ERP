@@ -8,9 +8,14 @@ import { BackendManager } from "./services/backend-manager.js";
 import { RendererServer } from "./services/renderer-server.js";
 import { NetworkMonitor } from "./services/network.js";
 import { buildAppMenu } from "./services/menu.js";
-import { createTray, destroyTray } from "./services/tray.js";
-import { notify } from "./services/notifications.js";
+import { createTray, destroyTray, refreshTray } from "./services/tray.js";
+import { notify, notifyEvent } from "./services/notifications.js";
 import { initUpdater } from "./services/updater.js";
+import { initCrashReporter, writeMainCrash } from "./services/crash-reporter.js";
+import { applyStartupSettings } from "./services/settings.js";
+import { backupOnExitIfEnabled, runBackup, startBackupSchedules, stopBackupSchedules } from "./services/backup.js";
+import { registerShortcuts } from "./services/shortcuts.js";
+import { closeAllExtraWindows, openWindow, setRendererBase } from "./windows/windows-manager.js";
 import { registerIpc } from "./ipc/index.js";
 import { EVENT_CHANNELS } from "../shared/ipc.js";
 
@@ -87,6 +92,8 @@ function bootstrap(): void {
 
 async function onReady(): Promise<void> {
   initLogging();
+  initCrashReporter();
+  applyStartupSettings();
   applySessionSecurity(session.defaultSession);
   buildAppMenu();
 
@@ -111,19 +118,48 @@ async function onReady(): Promise<void> {
   }
 
   // 3) النافذة الرئيسية
+  setRendererBase(rendererUrl); // للنوافذ المستقلّة (POS/التقارير/…)
   const win = createMainWindow(rendererUrl);
   win.once("ready-to-show", () => {
     if (!splash.isDestroyed()) splash.destroy();
   });
 
-  // 4) خدمات سطح المكتب
-  createTray(() => {
+  // 4) خدمات سطح المكتب Enterprise
+  const quit = (): void => {
     quitting = true;
     app.quit();
+  };
+  createTray({
+    onOpenDashboard: () => {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      win.webContents.send(EVENT_CHANNELS.NAVIGATE, "/");
+    },
+    onNewOrder: () => openWindow("pos"),
+    onPrintQueue: () => win.webContents.send(EVENT_CHANNELS.NAVIGATE, "/orders"),
+    onBackup: () => {
+      const e = runBackup("manual");
+      notifyEvent("backup-completed", e.file);
+    },
+    onQuit: quit,
+    syncStatus: () => (network.getStatus() === "online" ? "متصل" : "غير متصل"),
   });
   network.start();
   initUpdater();
   registerIpc({ backend, network });
+
+  // اختصارات لوحة المفاتيح (تبثّ إجراءات للواجهة الفعّالة)
+  registerShortcuts((action) => {
+    const focused = BrowserWindow.getFocusedWindow() ?? win;
+    focused.webContents.send(EVENT_CHANNELS.SHORTCUT, action);
+  });
+
+  // جداول النسخ الاحتياطي (يومي/أسبوعي حسب الإعدادات)
+  startBackupSchedules((e) => {
+    notifyEvent("backup-completed", e.file);
+    win.webContents.send(EVENT_CHANNELS.BACKUP_DONE, e);
+  });
 
   // 5) بثّ الحالة للـ renderer + إشعارات أصلية عند التحوّلات المهمة
   backend.on("status", (s) => {
@@ -132,8 +168,9 @@ async function onReady(): Promise<void> {
   });
   network.on("status", (s) => {
     win.webContents.send(EVENT_CHANNELS.NET_STATUS_CHANGED, s);
+    refreshTray(); // حدّث تسمية "المزامنة" في قائمة الـ tray
     if (s === "offline") notify("غير متصل", "فُقد الاتصال بالخادم المحلي. جارٍ إعادة المحاولة…");
-    if (s === "online") notify("عاد الاتصال", "تمّت إعادة الاتصال بالخادم.");
+    if (s === "online") notifyEvent("sync-completed", "عاد الاتصال بالخادم.");
   });
 
   log.info("desktop ready");
@@ -143,7 +180,10 @@ let cleanupDone = false;
 async function cleanup(): Promise<void> {
   if (cleanupDone) return;
   cleanupDone = true;
-  log.info("cleaning up (stopping backend + renderer)…");
+  log.info("cleaning up (backup + stopping services)…");
+  backupOnExitIfEnabled(); // نسخة عند الخروج إن كانت مُفعّلة
+  stopBackupSchedules();
+  closeAllExtraWindows();
   network.stop();
   destroyTray();
   await Promise.allSettled([backend.stop(), renderer.stop()]);
@@ -151,6 +191,10 @@ async function cleanup(): Promise<void> {
 }
 
 // ضمان إيقاف العمليات الفرعية حتى عند إشارات النظام
+// كتابة تقرير عطل محلي عند أي استثناء غير مُلتقَط في الـ main (بجانب سجلّ electron-log)
+process.on("uncaughtException", (err) => writeMainCrash(err));
+process.on("unhandledRejection", (reason) => writeMainCrash(reason));
+
 process.on("SIGINT", () => void handleSignal());
 process.on("SIGTERM", () => void handleSignal());
 async function handleSignal(): Promise<void> {

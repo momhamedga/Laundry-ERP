@@ -19,6 +19,25 @@ export const INVOKE_CHANNELS = {
   PRINT_SILENT: "print:silent",
   PRINT_PREVIEW: "print:preview",
   PRINT_TO_PDF: "print:to-pdf",
+  PRINT_RECEIPT: "print:receipt",
+  PRINT_RAW: "print:raw",
+  CASHDRAWER_OPEN: "cashdrawer:open",
+
+  WINDOW_OPEN: "window:open",
+  WINDOW_CLOSE: "window:close",
+  WINDOW_FOCUS: "window:focus",
+
+  SETTINGS_GET_ALL: "settings:get-all",
+  SETTINGS_UPDATE: "settings:update",
+
+  BACKUP_RUN: "backup:run",
+  BACKUP_LIST: "backup:list",
+  BACKUP_RESTORE: "backup:restore",
+
+  CRASH_LIST: "crash:list",
+  CRASH_OPEN_DIR: "crash:open-dir",
+
+  SHORTCUTS_LIST: "shortcuts:list",
 
   DIALOG_OPEN_FILE: "dialog:open-file",
   DIALOG_SAVE_FILE: "dialog:save-file",
@@ -44,6 +63,8 @@ export const EVENT_CHANNELS = {
   NET_STATUS_CHANGED: "net:status-changed",
   UPDATE_STATUS: "update:status",
   NAVIGATE: "app:navigate",
+  SHORTCUT: "app:shortcut",
+  BACKUP_DONE: "backup:done",
 } as const;
 
 /** مفاتيح التخزين المسموح بها للـ renderer (للرسائل التشخيصية) */
@@ -130,4 +151,77 @@ export interface IpcResult<T> {
   ok: boolean;
   data?: T;
   error?: string;
+}
+
+// ==================== Enterprise Desktop ====================
+
+/** أبعاد الورق حسب نوع الطابعة (Direct Printing) */
+export type PaperProfile = "A4" | "A5" | "thermal58" | "thermal80" | "label";
+
+export interface ReceiptPrintOptions {
+  html: string;
+  profile: PaperProfile;
+  deviceName?: string; // فارغ = الطابعة الافتراضية/المحفوظة
+  copies?: number;
+  landscape?: boolean;
+  silent?: boolean; // false = يُظهر حوار النظام
+  /** فتح درج الكاش بعد الطباعة (طابعة إيصالات) */
+  openCashDrawer?: boolean;
+}
+
+/** طباعة خام (ESC/POS) لطابعات الإيصالات/الباركود عبر شبكة أو منفذ خام */
+export interface RawPrintOptions {
+  /** بايتات ESC/POS مُرمّزة base64 */
+  dataBase64: string;
+  /** طابعة شبكية: مضيف + منفذ (9100 افتراضي) */
+  host?: string;
+  port?: number;
+}
+
+export interface CashDrawerOptions {
+  host?: string;
+  port?: number;
+  /** رمز النبضة: pin 2 (افتراضي) أو pin 5 */
+  pin?: 2 | 5;
+}
+
+export type DesktopWindowName = "pos" | "reports" | "customer" | "print-preview";
+
+/** إعدادات سطح المكتب الكاملة (تُحفظ محليّاً، بلا أسرار) */
+export interface DesktopSettings {
+  printer: string | null;
+  receiptPrinter: string | null;
+  receiptProfile: PaperProfile;
+  barcodePrinter: string | null;
+  labelPrinter: string | null;
+  cashDrawer: { enabled: boolean; host: string; port: number; pin: 2 | 5 };
+  camera: { deviceId: string | null };
+  backup: { daily: boolean; weekly: boolean; onExit: boolean; retentionDays: number };
+  sync: { enabled: boolean; intervalSec: number };
+  offline: { enabled: boolean };
+  notifications: { enabled: boolean };
+  theme: "light" | "dark" | "system";
+  language: "ar" | "en";
+  startup: { launchOnBoot: boolean; startMinimized: boolean };
+  autoUpdate: { enabled: boolean };
+  logging: { level: "info" | "warn" | "error" | "debug" };
+}
+
+export interface BackupEntry {
+  file: string;
+  createdAt: string;
+  sizeBytes: number;
+  kind: "daily" | "weekly" | "manual" | "exit";
+}
+
+export interface CrashReport {
+  file: string;
+  time: string;
+  reason: string;
+}
+
+export interface ShortcutDef {
+  id: string;
+  accelerator: string;
+  description: string;
 }

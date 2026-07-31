@@ -52,3 +52,26 @@ pnpm --filter @laundry/desktop package:linux  # AppImage (Linux)
 Context Isolation ✅ · Sandbox ✅ · nodeIntegration=false ✅ · Preload فقط ✅ ·
 IPC whitelist + validation ✅ · منع navigation/new-window ✅ · لا webview ✅ ·
 لا remote module ✅ · فتح الروابط الخارجية بأمان عبر المتصفح الافتراضي ✅.
+
+## ميزات Enterprise (Phase 11.5)
+كلها main-process، تُستهلَك من الواجهة عبر `window.desktop`، بلا تغيير أي API/DTO/DB.
+- **Direct Printing**: ملفّات A4/A5/58mm/80mm/label + طباعة صامتة + معاينة + اختيار طابعة
+  + طباعة خام ESC/POS لطابعة شبكية (`print.receipt/raw/silent/preview/toPdf/listPrinters`).
+- **Cash Drawer**: نبضة ESC/POS عبر منفذ خام (شبكة) (`cashDrawer.open`).
+- **Multi-Window**: نوافذ مستقلّة POS/Reports/Customer/Print-Preview (`windows.open/close/focus`).
+- **Settings**: إعدادات سطح مكتب كاملة (طابعات/كاميرا/نسخ/مزامنة/إشعارات/ثيم/لغة/بدء التشغيل…)
+  (`settings.getAll/update`).
+- **Auto Backup**: يومي/أسبوعي/يدوي/عند الخروج + ضغط gzip + سياسة احتفاظ + **Restore بتحقّق**
+  (`backup.run/list/restore`).
+- **Crash Reporter**: محلي فقط (Stack/Reason/System Info/Time)، بلا رفع خارجي (`crash.list/openDir`).
+- **Keyboard Shortcuts**: F1/F2/F3/Ctrl+S/P/N/F/Ctrl+Shift+S/Esc (تبثّ إجراءات للواجهة) (`shortcuts.list` + `on.shortcut`).
+- **Enhanced Tray**: لوحة التحكم/طلب جديد/قائمة الطباعة/حالة المزامنة/نسخة احتياطية/خروج.
+- **Desktop Notifications** مُصنّفة (طلب جديد/دفع/مخزون/مزامنة/تحديث/نسخة).
+- **File Association**: `.laundry` · `.invoice` · `.receipt`.
+
+### قيود صريحة (لم تُختبَر عتاديّاً / مؤجّلة — بلا ادّعاء)
+- الطباعة الحرارية/الملصقات/الباركود ودرج الكاش وماسح USB والكاميرا: **الكود جاهز لكن يتطلّب
+  عتاداً فعليّاً للتحقّق** (تعذّر اختباره في بيئة بلا عتاد). ماسح Keyboard-wedge يعمل بالواجهة.
+- **SQLite + Offline Mode + Background Sync + Camera scanning**: **مؤجّلة عمداً** — تتطلّب وحدة
+  أصلية (`better-sqlite3` → electron-rebuild) وتكاملاً كبيراً مع واجهة Admin (التقاط أوفلاين +
+  `getUserMedia`). شحنُها بلا اختبار سيخالف مبدأ عدم اختلاق النتائج. المعمارية موثّقة كمرحلة تالية.

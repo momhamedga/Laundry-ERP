@@ -5,12 +5,20 @@ import {
   SEND_CHANNELS,
   type AppInfo,
   type BackendStatus,
+  type BackupEntry,
+  type CashDrawerOptions,
+  type CrashReport,
+  type DesktopSettings,
+  type DesktopWindowName,
   type IpcResult,
   type NetStatus,
   type OpenFileOptions,
   type PdfExportOptions,
   type PrinterInfo,
+  type RawPrintOptions,
+  type ReceiptPrintOptions,
   type SaveFileOptions,
+  type ShortcutDef,
   type SilentPrintOptions,
   type UpdateStatus,
 } from "../shared/ipc.js";
@@ -49,6 +57,32 @@ const api = {
     silent: (opts: SilentPrintOptions) => invoke<void>(INVOKE_CHANNELS.PRINT_SILENT, opts),
     preview: (opts: SilentPrintOptions) => invoke<void>(INVOKE_CHANNELS.PRINT_PREVIEW, opts),
     toPdf: (opts: PdfExportOptions) => invoke<string | null>(INVOKE_CHANNELS.PRINT_TO_PDF, opts),
+    receipt: (opts: ReceiptPrintOptions) => invoke<boolean>(INVOKE_CHANNELS.PRINT_RECEIPT, opts),
+    raw: (opts: RawPrintOptions) => invoke<boolean>(INVOKE_CHANNELS.PRINT_RAW, opts),
+  },
+  cashDrawer: {
+    open: (opts?: CashDrawerOptions) => invoke<boolean>(INVOKE_CHANNELS.CASHDRAWER_OPEN, opts ?? {}),
+  },
+  windows: {
+    open: (name: DesktopWindowName) => invoke<boolean>(INVOKE_CHANNELS.WINDOW_OPEN, { name }),
+    close: (name: DesktopWindowName) => invoke<boolean>(INVOKE_CHANNELS.WINDOW_CLOSE, { name }),
+    focus: (name: DesktopWindowName) => invoke<boolean>(INVOKE_CHANNELS.WINDOW_FOCUS, { name }),
+  },
+  settings: {
+    getAll: () => invoke<DesktopSettings>(INVOKE_CHANNELS.SETTINGS_GET_ALL),
+    update: (patch: Partial<DesktopSettings>) => invoke<DesktopSettings>(INVOKE_CHANNELS.SETTINGS_UPDATE, patch),
+  },
+  backup: {
+    run: () => invoke<BackupEntry>(INVOKE_CHANNELS.BACKUP_RUN),
+    list: () => invoke<BackupEntry[]>(INVOKE_CHANNELS.BACKUP_LIST),
+    restore: (file: string) => invoke<string[]>(INVOKE_CHANNELS.BACKUP_RESTORE, { file }),
+  },
+  crash: {
+    list: () => invoke<CrashReport[]>(INVOKE_CHANNELS.CRASH_LIST),
+    openDir: () => invoke<boolean>(INVOKE_CHANNELS.CRASH_OPEN_DIR),
+  },
+  shortcuts: {
+    list: () => invoke<ShortcutDef[]>(INVOKE_CHANNELS.SHORTCUTS_LIST),
   },
   dialog: {
     openFile: (opts?: OpenFileOptions) => invoke<string[]>(INVOKE_CHANNELS.DIALOG_OPEN_FILE, opts),
@@ -75,6 +109,8 @@ const api = {
     netStatus: (cb: (s: NetStatus) => void) => subscribe<NetStatus>(EVENT_CHANNELS.NET_STATUS_CHANGED, cb),
     updateStatus: (cb: (s: UpdateStatus) => void) => subscribe<UpdateStatus>(EVENT_CHANNELS.UPDATE_STATUS, cb),
     navigate: (cb: (route: string) => void) => subscribe<string>(EVENT_CHANNELS.NAVIGATE, cb),
+    shortcut: (cb: (action: string) => void) => subscribe<string>(EVENT_CHANNELS.SHORTCUT, cb),
+    backupDone: (cb: (e: BackupEntry) => void) => subscribe<BackupEntry>(EVENT_CHANNELS.BACKUP_DONE, cb),
   },
 } as const;
 

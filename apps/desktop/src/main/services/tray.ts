@@ -27,26 +27,50 @@ function showMainWindow(): void {
   win.focus();
 }
 
-/** يُنشئ أيقونة شريط النظام مع قائمة سياق (إظهار/خروج). آمن إن غابت الأيقونة. */
-export function createTray(onQuit: () => void): Tray | null {
+export interface TrayHandlers {
+  onOpenDashboard: () => void;
+  onNewOrder: () => void;
+  onPrintQueue: () => void;
+  onBackup: () => void;
+  onQuit: () => void;
+  syncStatus: () => string;
+}
+
+let handlersRef: TrayHandlers | null = null;
+
+function buildMenu(h: TrayHandlers): Menu {
+  return Menu.buildFromTemplate([
+    { label: "فتح لوحة التحكم", click: h.onOpenDashboard },
+    { label: "طلب جديد", click: h.onNewOrder },
+    { label: "قائمة الطباعة", click: h.onPrintQueue },
+    { type: "separator" },
+    { label: `المزامنة: ${h.syncStatus()}`, enabled: false },
+    { label: "نسخة احتياطية الآن", click: h.onBackup },
+    { type: "separator" },
+    { label: `الإصدار ${app.getVersion()}`, enabled: false },
+    { label: "خروج", click: h.onQuit },
+  ]);
+}
+
+/** أيقونة شريط النظام بقائمة Enterprise (لوحة/طلب/طباعة/مزامنة/نسخ/خروج). آمنة إن غابت الأيقونة. */
+export function createTray(handlers: TrayHandlers): Tray | null {
+  handlersRef = handlers;
   try {
     tray = new Tray(trayImage());
     tray.setToolTip("نظام إدارة المغاسل");
-    const menu = Menu.buildFromTemplate([
-      { label: "فتح التطبيق", click: showMainWindow },
-      { type: "separator" },
-      { label: `الإصدار ${app.getVersion()}`, enabled: false },
-      { type: "separator" },
-      { label: "خروج", click: onQuit },
-    ]);
-    tray.setContextMenu(menu);
+    tray.setContextMenu(buildMenu(handlers));
     tray.on("double-click", showMainWindow);
-    log.info("tray created");
+    log.info("tray created (enterprise menu)");
     return tray;
   } catch (err) {
     log.error("failed to create tray:", err);
     return null;
   }
+}
+
+/** يعيد بناء قائمة الـ tray (مثلاً عند تغيّر حالة المزامنة). */
+export function refreshTray(): void {
+  if (tray && handlersRef && !tray.isDestroyed()) tray.setContextMenu(buildMenu(handlersRef));
 }
 
 export function destroyTray(): void {

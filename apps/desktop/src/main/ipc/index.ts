@@ -2,9 +2,29 @@ import { app, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs/promises";
 import { scoped } from "../logger.js";
 import { getMainWindow } from "../windows/main-window.js";
-import { exportPdf, listPrinters, previewPrint, silentPrint } from "../services/printing.js";
+import {
+  exportPdf,
+  listPrinters,
+  previewPrint,
+  printRaw,
+  printReceipt,
+  silentPrint,
+} from "../services/printing.js";
+import { openCashDrawer } from "../services/cash-drawer.js";
+import { closeWindow, focusWindow, openWindow } from "../windows/windows-manager.js";
+import { getSettings, updateSettings } from "../services/settings.js";
+import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
+import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
+import { listShortcuts } from "../services/shortcuts.js";
 import type { BackendManager } from "../services/backend-manager.js";
 import type { NetworkMonitor } from "../services/network.js";
+import type {
+  CashDrawerOptions,
+  DesktopSettings,
+  DesktopWindowName,
+  RawPrintOptions,
+  ReceiptPrintOptions,
+} from "../../shared/ipc.js";
 import {
   INVOKE_CHANNELS,
   SEND_CHANNELS,
@@ -153,6 +173,56 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
 
   handle(INVOKE_CHANNELS.BACKEND_STATUS, () => backend.getStatus());
   handle(INVOKE_CHANNELS.NET_STATUS, () => network.getStatus());
+
+  // ==================== Enterprise: printing / cash drawer ====================
+  handle(INVOKE_CHANNELS.PRINT_RECEIPT, async (_e, payload) => {
+    const o = assertObject(payload);
+    if (typeof o.html !== "string" || o.html.length === 0) throw new Error("html is required");
+    if (typeof o.profile !== "string") throw new Error("profile is required");
+    await printReceipt(o as unknown as ReceiptPrintOptions);
+    return true;
+  });
+  handle(INVOKE_CHANNELS.PRINT_RAW, async (_e, payload) => {
+    const o = assertObject(payload);
+    if (typeof o.dataBase64 !== "string") throw new Error("dataBase64 is required");
+    await printRaw(o as unknown as RawPrintOptions);
+    return true;
+  });
+  handle(INVOKE_CHANNELS.CASHDRAWER_OPEN, async (_e, payload) => {
+    await openCashDrawer((payload ?? {}) as CashDrawerOptions);
+    return true;
+  });
+
+  // ==================== Enterprise: windows ====================
+  const asWindowName = (payload: unknown): DesktopWindowName => {
+    const { name } = assertObject(payload);
+    const valid: DesktopWindowName[] = ["pos", "reports", "customer", "print-preview"];
+    if (!valid.includes(name as DesktopWindowName)) throw new Error(`Invalid window: ${String(name)}`);
+    return name as DesktopWindowName;
+  };
+  handle(INVOKE_CHANNELS.WINDOW_OPEN, (_e, p) => (openWindow(asWindowName(p)), true));
+  handle(INVOKE_CHANNELS.WINDOW_CLOSE, (_e, p) => (closeWindow(asWindowName(p)), true));
+  handle(INVOKE_CHANNELS.WINDOW_FOCUS, (_e, p) => (focusWindow(asWindowName(p)), true));
+
+  // ==================== Enterprise: settings ====================
+  handle(INVOKE_CHANNELS.SETTINGS_GET_ALL, () => getSettings());
+  handle(INVOKE_CHANNELS.SETTINGS_UPDATE, (_e, payload) =>
+    updateSettings(assertObject(payload) as Partial<DesktopSettings>),
+  );
+
+  // ==================== Enterprise: backup / restore ====================
+  handle(INVOKE_CHANNELS.BACKUP_RUN, () => runBackup("manual"));
+  handle(INVOKE_CHANNELS.BACKUP_LIST, () => listBackups());
+  handle(INVOKE_CHANNELS.BACKUP_RESTORE, (_e, payload) => {
+    const { file } = assertObject(payload);
+    if (typeof file !== "string") throw new Error("file is required");
+    return restoreBackup(file);
+  });
+
+  // ==================== Enterprise: crash / shortcuts ====================
+  handle(INVOKE_CHANNELS.CRASH_LIST, () => listCrashReports());
+  handle(INVOKE_CHANNELS.CRASH_OPEN_DIR, () => (openCrashDir(), true));
+  handle(INVOKE_CHANNELS.SHORTCUTS_LIST, () => listShortcuts());
 
   // ==================== One-way (renderer → main) ====================
   ipcMain.on(SEND_CHANNELS.LOG_RENDERER, (_e, level: unknown, message: unknown) => {

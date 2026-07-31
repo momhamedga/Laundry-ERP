@@ -5,6 +5,7 @@ import { scoped } from "../logger.js";
 import { hardenWebContents } from "../security.js";
 import { getSetting } from "../storage.js";
 import { restoredWindowOptions, trackWindowState, MIN_WIDTH, MIN_HEIGHT } from "../window-state.js";
+import { writeRendererCrash } from "../services/crash-reporter.js";
 import { EVENT_CHANNELS } from "../../shared/ipc.js";
 
 const log = scoped("main-window");
@@ -69,6 +70,7 @@ export function createMainWindow(rendererUrl: string): BrowserWindow {
   win.webContents.on("render-process-gone", (_e, details) => {
     log.error("renderer process gone:", details.reason);
     if (details.reason === "clean-exit" || win.isDestroyed()) return;
+    writeRendererCrash(details); // تقرير عطل محلي (بلا رفع)
     // أعد التحميل مرة واحدة تلقائياً للتعافي من انهيار الـ renderer
     log.warn("reloading renderer after crash…");
     win.webContents.reload();

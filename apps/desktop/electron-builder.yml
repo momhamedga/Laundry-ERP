@@ -2,6 +2,18 @@ appId: com.laundryerp.desktop
 productName: Laundry ERP
 copyright: Copyright © 2026 Laundry ERP
 
+# ربط أنواع ملفّات التطبيق (يفتحها البرنامج مباشرة)
+fileAssociations:
+  - ext: laundry
+    name: Laundry ERP Document
+    role: Editor
+  - ext: invoice
+    name: Laundry Invoice
+    role: Viewer
+  - ext: receipt
+    name: Laundry Receipt
+    role: Viewer
+
 directories:
   output: release
   buildResources: build
