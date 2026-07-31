@@ -11,9 +11,20 @@ import {
   type DesktopSettings,
   type DesktopWindowName,
   type IpcResult,
+  type CacheEntity,
+  type CustomerPatch,
+  type ListQuery,
+  type LocalCustomer,
+  type LocalOrder,
+  type LocalOrderWithItems,
+  type LocalPayment,
   type NetStatus,
+  type NewCustomer,
+  type NewOrder,
+  type NewPayment,
   type OfflineDbStatus,
   type OpenFileOptions,
+  type SyncQueueItem,
   type PdfExportOptions,
   type PrinterInfo,
   type RawPrintOptions,
@@ -87,6 +98,38 @@ const api = {
   },
   offline: {
     dbStatus: () => invoke<OfflineDbStatus>(INVOKE_CHANNELS.OFFLINE_DB_STATUS),
+    customers: {
+      create: (input: NewCustomer) =>
+        invoke<LocalCustomer>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_CREATE, input),
+      update: (id: string, patch: CustomerPatch) =>
+        invoke<LocalCustomer>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_UPDATE, { id, patch }),
+      list: (query?: ListQuery) =>
+        invoke<LocalCustomer[]>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_LIST, query ?? {}),
+      get: (id: string) =>
+        invoke<LocalCustomer | null>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_GET, { id }),
+    },
+    orders: {
+      create: (input: NewOrder) =>
+        invoke<LocalOrderWithItems>(INVOKE_CHANNELS.OFFLINE_ORDER_CREATE, input),
+      list: (query?: ListQuery) =>
+        invoke<LocalOrder[]>(INVOKE_CHANNELS.OFFLINE_ORDER_LIST, query ?? {}),
+      get: (id: string) =>
+        invoke<LocalOrderWithItems | null>(INVOKE_CHANNELS.OFFLINE_ORDER_GET, { id }),
+    },
+    payments: {
+      create: (input: NewPayment) =>
+        invoke<LocalPayment>(INVOKE_CHANNELS.OFFLINE_PAYMENT_CREATE, input),
+      list: (orderId: string) =>
+        invoke<LocalPayment[]>(INVOKE_CHANNELS.OFFLINE_PAYMENT_LIST, { order_id: orderId }),
+    },
+    cache: {
+      put: (entity: CacheEntity, rows: Record<string, unknown>[]) =>
+        invoke<number>(INVOKE_CHANNELS.OFFLINE_CACHE_PUT, { entity, rows }),
+    },
+    queue: {
+      list: (limit?: number) =>
+        invoke<SyncQueueItem[]>(INVOKE_CHANNELS.OFFLINE_QUEUE_LIST, { limit }),
+    },
   },
   dialog: {
     openFile: (opts?: OpenFileOptions) => invoke<string[]>(INVOKE_CHANNELS.DIALOG_OPEN_FILE, opts),

@@ -41,6 +41,19 @@ export const INVOKE_CHANNELS = {
 
   OFFLINE_DB_STATUS: "offline:db-status",
 
+  // Phase 11.6B — Offline Repository Layer (قراءة/كتابة محلّية عبر SQLite)
+  OFFLINE_CUSTOMER_CREATE: "offline:customer:create",
+  OFFLINE_CUSTOMER_UPDATE: "offline:customer:update",
+  OFFLINE_CUSTOMER_LIST: "offline:customer:list",
+  OFFLINE_CUSTOMER_GET: "offline:customer:get",
+  OFFLINE_ORDER_CREATE: "offline:order:create",
+  OFFLINE_ORDER_LIST: "offline:order:list",
+  OFFLINE_ORDER_GET: "offline:order:get",
+  OFFLINE_PAYMENT_CREATE: "offline:payment:create",
+  OFFLINE_PAYMENT_LIST: "offline:payment:list",
+  OFFLINE_CACHE_PUT: "offline:cache:put",
+  OFFLINE_QUEUE_LIST: "offline:queue:list",
+
   DIALOG_OPEN_FILE: "dialog:open-file",
   DIALOG_SAVE_FILE: "dialog:save-file",
 
@@ -235,4 +248,131 @@ export interface OfflineDbStatus {
   sqliteVersion: string;
   tables: number;
   pendingSync: number;
+}
+
+// ==================== Phase 11.6B — Offline Repository Layer ====================
+// أنواع الصفوف المحلّية (تطابق أعمدة SQLite: 0/1 للأعلام المنطقية)
+
+export interface LocalCustomer {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  _local: number;
+  _dirty: number;
+  _synced_at: string | null;
+}
+export interface NewCustomer {
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+}
+export interface CustomerPatch {
+  name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  is_active?: boolean;
+}
+
+export interface LocalOrderItem {
+  id: string;
+  order_id: string;
+  service_id: string | null;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  subtotal: number;
+  notes: string | null;
+}
+export interface NewOrderItem {
+  service_id?: string;
+  quantity: number;
+  unit_price: number;
+  discount?: number;
+  notes?: string;
+}
+
+export interface LocalOrder {
+  id: string;
+  order_number: string | null;
+  customer_id: string | null;
+  branch_id: string | null;
+  status: string;
+  payment_status: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid_amount: number;
+  received_at: string | null;
+  due_date: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  _local: number;
+  _dirty: number;
+  _synced_at: string | null;
+}
+export interface LocalOrderWithItems extends LocalOrder {
+  items: LocalOrderItem[];
+}
+export interface NewOrder {
+  customer_id?: string;
+  branch_id?: string;
+  order_number?: string;
+  items: NewOrderItem[];
+  discount?: number;
+  notes?: string;
+  due_date?: string;
+}
+
+export interface LocalPayment {
+  id: string;
+  order_id: string;
+  amount: number;
+  method: string;
+  status: string;
+  reference: string | null;
+  created_at: string;
+  _local: number;
+  _dirty: number;
+  _synced_at: string | null;
+}
+export interface NewPayment {
+  order_id: string;
+  amount: number;
+  method?: string;
+  reference?: string;
+}
+
+export interface SyncQueueItem {
+  id: number;
+  entity: string;
+  op: string;
+  entity_id: string | null;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** كيانات الكاش للقراءة (تُملأ من السيرفر عند الاتصال) */
+export type CacheEntity =
+  | "users"
+  | "permissions"
+  | "services"
+  | "categories"
+  | "inventory"
+  | "branches";
+
+export interface ListQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
 }

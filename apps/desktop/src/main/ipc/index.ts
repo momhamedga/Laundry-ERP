@@ -17,12 +17,31 @@ import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
 import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
 import { dbStatus } from "../db/database.js";
+import {
+  createCustomer,
+  updateCustomer,
+  listCustomers,
+  getCustomer,
+  createOrder,
+  listOrders,
+  getOrder,
+  createPayment,
+  listPayments,
+  putCache,
+  listAll as listQueue,
+} from "../db/repositories/index.js";
 import type { BackendManager } from "../services/backend-manager.js";
 import type { NetworkMonitor } from "../services/network.js";
 import type {
+  CacheEntity,
   CashDrawerOptions,
+  CustomerPatch,
   DesktopSettings,
   DesktopWindowName,
+  ListQuery,
+  NewCustomer,
+  NewOrder,
+  NewPayment,
   RawPrintOptions,
   ReceiptPrintOptions,
 } from "../../shared/ipc.js";
@@ -227,6 +246,57 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
 
   // ==================== Offline (Phase 11.6A): حالة قاعدة SQLite ====================
   handle(INVOKE_CHANNELS.OFFLINE_DB_STATUS, () => dbStatus());
+
+  // ==================== Offline Repository (Phase 11.6B): قراءة/كتابة محلّية ====================
+  const asString = (o: Record<string, unknown>, key: string): string => {
+    const v = o[key];
+    if (typeof v !== "string" || v.length === 0) throw new Error(`${key} is required`);
+    return v;
+  };
+
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_CREATE, (_e, p) =>
+    createCustomer(assertObject(p) as unknown as NewCustomer),
+  );
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_UPDATE, (_e, p) => {
+    const o = assertObject(p);
+    return updateCustomer(asString(o, "id"), (o.patch ?? {}) as CustomerPatch);
+  });
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_LIST, (_e, p) =>
+    listCustomers((p ?? {}) as ListQuery),
+  );
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_GET, (_e, p) =>
+    getCustomer(asString(assertObject(p), "id")),
+  );
+
+  handle(INVOKE_CHANNELS.OFFLINE_ORDER_CREATE, (_e, p) =>
+    createOrder(assertObject(p) as unknown as NewOrder),
+  );
+  handle(INVOKE_CHANNELS.OFFLINE_ORDER_LIST, (_e, p) => listOrders((p ?? {}) as ListQuery));
+  handle(INVOKE_CHANNELS.OFFLINE_ORDER_GET, (_e, p) =>
+    getOrder(asString(assertObject(p), "id")),
+  );
+
+  handle(INVOKE_CHANNELS.OFFLINE_PAYMENT_CREATE, (_e, p) =>
+    createPayment(assertObject(p) as unknown as NewPayment),
+  );
+  handle(INVOKE_CHANNELS.OFFLINE_PAYMENT_LIST, (_e, p) =>
+    listPayments(asString(assertObject(p), "order_id")),
+  );
+
+  const CACHE_ENTITIES: CacheEntity[] = [
+    "users", "permissions", "services", "categories", "inventory", "branches",
+  ];
+  handle(INVOKE_CHANNELS.OFFLINE_CACHE_PUT, (_e, p) => {
+    const o = assertObject(p);
+    const entity = o.entity as CacheEntity;
+    if (!CACHE_ENTITIES.includes(entity)) throw new Error(`Invalid cache entity: ${String(entity)}`);
+    if (!Array.isArray(o.rows)) throw new Error("rows must be an array");
+    return putCache(entity, o.rows as Record<string, unknown>[]);
+  });
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_LIST, (_e, p) => {
+    const o = (p ?? {}) as { limit?: number };
+    return listQueue(typeof o.limit === "number" ? o.limit : 200);
+  });
 
   // ==================== One-way (renderer → main) ====================
   ipcMain.on(SEND_CHANNELS.LOG_RENDERER, (_e, level: unknown, message: unknown) => {
