@@ -59,6 +59,13 @@ export const INVOKE_CHANNELS = {
   OFFLINE_SYNC_NOW: "offline:sync:now",
   OFFLINE_SYNC_STATE: "offline:sync:state",
 
+  // Phase 11.6E — Queue management / conflict dead-letter
+  OFFLINE_QUEUE_FAILED: "offline:queue:failed",
+  OFFLINE_QUEUE_RETRY: "offline:queue:retry",
+  OFFLINE_QUEUE_RETRY_ALL: "offline:queue:retry-all",
+  OFFLINE_QUEUE_DISCARD: "offline:queue:discard",
+  OFFLINE_QUEUE_STATS: "offline:queue:stats",
+
   // Phase 11.6D — Barcode / Camera / Scanner
   BARCODE_GENERATE: "barcode:generate",
   BARCODE_VALIDATE: "barcode:validate",
@@ -383,6 +390,15 @@ export interface SyncResult {
   retried: number;
   skipped?: boolean;
   reason?: string;
+}
+
+/** عدّادات طابور المزامنة حسب الحالة (Phase 11.6E) */
+export interface QueueStats {
+  pending: number;
+  syncing: number;
+  done: number;
+  failed: number;
+  cancelled: number;
 }
 
 /** حالة محرّك المزامنة (Phase 11.6C) */

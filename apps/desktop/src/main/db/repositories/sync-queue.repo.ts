@@ -61,11 +61,16 @@ export interface SyncQueueFull extends SyncQueueItem {
   payload: string;
 }
 
-/** يلتقط العمليات المعلّقة (بالترتيب) مع الحمولة لمعالجتها. */
+/**
+ * يلتقط العمليات المستحقّة للمعالجة (بالترتيب) مع الحمولة: pending وحان وقت
+ * محاولتها (next_attempt_at فارغ أو مضى) — احترام التراجع الأُسّي (Phase 11.6E).
+ */
 export function takePending(limit = 200): SyncQueueFull[] {
   return getDb()
     .prepare(
-      `SELECT ${SELECT_COLS}, payload FROM sync_queue WHERE status = 'pending' ORDER BY id ASC LIMIT ?`,
+      `SELECT ${SELECT_COLS}, payload FROM sync_queue
+       WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now'))
+       ORDER BY id ASC LIMIT ?`,
     )
     .all(limit) as SyncQueueFull[];
 }
@@ -82,13 +87,19 @@ export function markDone(id: number): void {
     .run(id);
 }
 
-/** فشل قابل لإعادة المحاولة: يبقى pending مع زيادة العدّاد وتسجيل الخطأ. */
-export function markRetry(id: number, error: string): void {
+/**
+ * فشل قابل لإعادة المحاولة: يبقى pending مع زيادة العدّاد، تسجيل الخطأ، وجدولة
+ * المحاولة القادمة بعد backoffSec ثانية (تراجع أُسّي).
+ */
+export function markRetry(id: number, error: string, backoffSec: number): void {
   getDb()
     .prepare(
-      "UPDATE sync_queue SET status='pending', attempts=attempts+1, last_error=?, updated_at=datetime('now') WHERE id=?",
+      `UPDATE sync_queue
+       SET status='pending', attempts=attempts+1, last_error=?,
+           next_attempt_at=datetime('now', ?), updated_at=datetime('now')
+       WHERE id=?`,
     )
-    .run(error.slice(0, 500), id);
+    .run(error.slice(0, 500), `+${Math.max(0, Math.round(backoffSec))} seconds`, id);
 }
 
 /** فشل نهائي (غير قابل لإعادة المحاولة أو تجاوز الحدّ الأقصى). */
@@ -136,4 +147,59 @@ export function resolveServerId(entity: string, id: string): string {
     .get(entity, id) as { server_id: string } | undefined;
   if (!row) throw new Error(`dependency not synced yet: ${entity} ${id}`);
   return row.server_id;
+}
+
+// ==================== Phase 11.6E — Dead-letter / إدارة الطابور ====================
+
+/** العمليات الفاشلة (dead-letter) للعرض والتدخّل اليدوي. */
+export function listFailed(limit = 200): SyncQueueItem[] {
+  return getDb()
+    .prepare(
+      `SELECT ${SELECT_COLS} FROM sync_queue WHERE status = 'failed' ORDER BY id ASC LIMIT ?`,
+    )
+    .all(limit) as SyncQueueItem[];
+}
+
+/** يعيد عملية فاشلة للطابور (يصفّر العدّاد والجدولة) — إعادة محاولة يدوية. */
+export function retryOp(id: number): boolean {
+  const r = getDb()
+    .prepare(
+      `UPDATE sync_queue
+       SET status='pending', attempts=0, last_error=NULL, next_attempt_at=NULL, updated_at=datetime('now')
+       WHERE id=? AND status='failed'`,
+    )
+    .run(id);
+  return r.changes > 0;
+}
+
+/** يعيد كل الفاشلة للطابور؛ يعيد عددها. */
+export function retryAllFailed(): number {
+  const r = getDb()
+    .prepare(
+      `UPDATE sync_queue
+       SET status='pending', attempts=0, last_error=NULL, next_attempt_at=NULL, updated_at=datetime('now')
+       WHERE status='failed'`,
+    )
+    .run();
+  return r.changes;
+}
+
+/** يلغي عملية فاشلة نهائياً (تجاهل يدوي) — يُحوّلها cancelled ولا تُعالَج ثانية. */
+export function discardOp(id: number): boolean {
+  const r = getDb()
+    .prepare(
+      "UPDATE sync_queue SET status='cancelled', updated_at=datetime('now') WHERE id=? AND status='failed'",
+    )
+    .run(id);
+  return r.changes > 0;
+}
+
+/** عدّادات الطابور حسب الحالة (للوحة المزامنة). */
+export function queueStats(): Record<string, number> {
+  const rows = getDb()
+    .prepare("SELECT status, count(*) c FROM sync_queue GROUP BY status")
+    .all() as { status: string; c: number }[];
+  const out: Record<string, number> = { pending: 0, syncing: 0, done: 0, failed: 0, cancelled: 0 };
+  for (const r of rows) out[r.status] = r.c;
+  return out;
 }

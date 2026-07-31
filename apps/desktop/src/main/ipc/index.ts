@@ -33,6 +33,11 @@ import {
   listPayments,
   putCache,
   listAll as listQueue,
+  listFailed,
+  retryOp,
+  retryAllFailed,
+  discardOp,
+  queueStats,
 } from "../db/repositories/index.js";
 import type { BackendManager } from "../services/backend-manager.js";
 import type { NetworkMonitor } from "../services/network.js";
@@ -315,6 +320,21 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   });
   handle(INVOKE_CHANNELS.OFFLINE_SYNC_NOW, () => syncEngine.syncNow("manual"));
   handle(INVOKE_CHANNELS.OFFLINE_SYNC_STATE, () => syncEngine.getState());
+
+  // ==================== Queue management / dead-letter (Phase 11.6E) ====================
+  const asId = (p: unknown): number => {
+    const { id } = assertObject(p);
+    if (typeof id !== "number" || !Number.isInteger(id)) throw new Error("id must be an integer");
+    return id;
+  };
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_FAILED, (_e, p) => {
+    const o = (p ?? {}) as { limit?: number };
+    return listFailed(typeof o.limit === "number" ? o.limit : 200);
+  });
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_RETRY, (_e, p) => retryOp(asId(p)));
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_RETRY_ALL, () => retryAllFailed());
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_DISCARD, (_e, p) => discardOp(asId(p)));
+  handle(INVOKE_CHANNELS.OFFLINE_QUEUE_STATS, () => queueStats());
 
   // ==================== Barcode / Camera / Scanner (Phase 11.6D) ====================
   const SYMBOLOGIES: BarcodeSymbology[] = ["code128", "code39", "ean13", "ean8", "upca", "qrcode"];

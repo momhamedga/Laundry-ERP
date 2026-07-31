@@ -11,4 +11,13 @@ export {
 export { createOrder, listOrders, getOrder } from "./orders.repo.js";
 export { createPayment, listPayments, getPayment } from "./payments.repo.js";
 export { putCache, readCache } from "./cache.repo.js";
-export { listPending, listAll, pendingCount } from "./sync-queue.repo.js";
+export {
+  listPending,
+  listAll,
+  pendingCount,
+  listFailed,
+  retryOp,
+  retryAllFailed,
+  discardOp,
+  queueStats,
+} from "./sync-queue.repo.js";

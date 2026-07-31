@@ -26,6 +26,7 @@ import {
   type NewPayment,
   type OfflineDbStatus,
   type OpenFileOptions,
+  type QueueStats,
   type SaveCaptureOptions,
   type ScanValidation,
   type SyncQueueItem,
@@ -146,6 +147,12 @@ const api = {
     queue: {
       list: (limit?: number) =>
         invoke<SyncQueueItem[]>(INVOKE_CHANNELS.OFFLINE_QUEUE_LIST, { limit }),
+      failed: (limit?: number) =>
+        invoke<SyncQueueItem[]>(INVOKE_CHANNELS.OFFLINE_QUEUE_FAILED, { limit }),
+      retry: (id: number) => invoke<boolean>(INVOKE_CHANNELS.OFFLINE_QUEUE_RETRY, { id }),
+      retryAll: () => invoke<number>(INVOKE_CHANNELS.OFFLINE_QUEUE_RETRY_ALL),
+      discard: (id: number) => invoke<boolean>(INVOKE_CHANNELS.OFFLINE_QUEUE_DISCARD, { id }),
+      stats: () => invoke<QueueStats>(INVOKE_CHANNELS.OFFLINE_QUEUE_STATS),
     },
     sync: {
       setAuth: (token: string | null) =>

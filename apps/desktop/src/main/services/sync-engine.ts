@@ -30,6 +30,13 @@ const log = scoped("sync");
 
 const MAX_ATTEMPTS = 6;
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const BACKOFF_BASE_SEC = 5;
+const BACKOFF_CAP_SEC = 300;
+
+/** تراجع أُسّي: 5, 10, 20, … بحدّ أقصى 300 ثانية (حسب عدد المحاولات الحالي). */
+function backoffSeconds(attempts: number): number {
+  return Math.min(BACKOFF_CAP_SEC, BACKOFF_BASE_SEC * 2 ** attempts);
+}
 
 class SyncHttpError extends Error {
   constructor(
@@ -119,14 +126,32 @@ class SyncEngine extends EventEmitter {
           done++;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          const conflict = err instanceof SyncHttpError && err.status === 409;
+          // تعارض (409): جرّب حلّه تلقائياً (مثل ربط عميل مكرّر بالموجود على السيرفر)
+          if (err instanceof SyncHttpError && err.status === 409) {
+            let resolution: string | null = null;
+            try {
+              resolution = await this.resolveConflict(op);
+            } catch (rerr) {
+              logSync(op.id, op.entity, op.op, "conflict", `resolve failed: ${String(rerr)}`);
+            }
+            if (resolution) {
+              markDone(op.id);
+              logSync(op.id, op.entity, op.op, "conflict", `resolved: ${resolution}`);
+              done++;
+            } else {
+              markFailed(op.id, msg); // لا يوجد حلّ آلي → تدخّل يدوي (dead-letter)
+              logSync(op.id, op.entity, op.op, "conflict", msg);
+              failed++;
+            }
+            continue;
+          }
           if (isRetryable(err) && op.attempts + 1 < MAX_ATTEMPTS) {
-            markRetry(op.id, msg);
+            markRetry(op.id, msg, backoffSeconds(op.attempts));
             logSync(op.id, op.entity, op.op, "error", `retry: ${msg}`);
             retried++;
           } else {
             markFailed(op.id, msg);
-            logSync(op.id, op.entity, op.op, conflict ? "conflict" : "error", msg);
+            logSync(op.id, op.entity, op.op, "error", msg);
             failed++;
           }
         }
@@ -222,18 +247,40 @@ class SyncEngine extends EventEmitter {
     }
   }
 
+  /**
+   * حلّ التعارضات آلياً (Phase 11.6E). حاليّاً: عميل أُنشئ أوفلاين برقم هاتف موجود
+   * على السيرفر → نجلب العميل الموجود ونربط المعرّف المحلّي به (بدل تكرار). يُعيد
+   * وصف الحلّ عند النجاح أو null إن لم يوجد حلّ آلي (يذهب للتدخّل اليدوي).
+   */
+  private async resolveConflict(op: SyncQueueFull): Promise<string | null> {
+    const p = JSON.parse(op.payload) as Record<string, unknown>;
+    if (op.entity === "customer" && op.op === "create") {
+      const phone = String(p.phone ?? "");
+      if (!phone) return null;
+      const data = await this.request(
+        "GET",
+        `/api/v1/customers/phone/${encodeURIComponent(phone)}`,
+      );
+      const serverId = (data as { customer?: { id?: string } }).customer?.id;
+      if (!serverId) return null;
+      mapId("customer", String(p.id), serverId);
+      markSynced("customers", String(p.id));
+      return `linked to existing customer ${serverId}`;
+    }
+    return null;
+  }
+
   /** طلب HTTP موحّد يفكّ غلاف { success, data } ويحوّل الأخطاء لأنواع مناسبة. */
-  private async request(method: string, path: string, body: unknown): Promise<unknown> {
+  private async request(method: string, path: string, body?: unknown): Promise<unknown> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    const init: RequestInit = { method, headers };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
     let res: Response;
     try {
-      res = await fetch(this.baseUrl + path, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      res = await fetch(this.baseUrl + path, init);
     } catch (err) {
       // فشل شبكة/اتصال → قابل لإعادة المحاولة (ليس SyncHttpError)
       throw new Error(`network error: ${err instanceof Error ? err.message : String(err)}`);

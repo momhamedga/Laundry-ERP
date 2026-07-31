@@ -106,11 +106,12 @@ CREATE TABLE IF NOT EXISTS sync_queue (
   op          TEXT NOT NULL,              -- create|update|delete
   entity_id   TEXT,                       -- id محلّي/سيرفر
   payload     TEXT NOT NULL,              -- JSON للعملية
-  status      TEXT NOT NULL DEFAULT 'pending', -- pending|syncing|done|failed
-  attempts    INTEGER NOT NULL DEFAULT 0,
-  last_error  TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  status       TEXT NOT NULL DEFAULT 'pending', -- pending|syncing|done|failed|cancelled
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  last_error   TEXT,
+  next_attempt_at TEXT,                        -- تراجع أُسّي: لا تُلتقط قبل هذا الوقت
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id);
 
@@ -199,6 +200,17 @@ export const OFFLINE_TABLES = [
 
 let db: Database.Database | null = null;
 
+/** يضيف عموداً إن لم يكن موجوداً (ترقية idempotent لقواعد أُنشئت بمخطّط أقدم). */
+function ensureColumn(d: Database.Database, table: string, column: string, ddl: string): void {
+  const cols = d.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) d.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
+/** ترقيات المخطّط للقواعد القائمة (Phase 11.6E: عمود جدولة التراجع). */
+function migrate(d: Database.Database): void {
+  ensureColumn(d, "sync_queue", "next_attempt_at", "next_attempt_at TEXT");
+}
+
 /** يفتح القاعدة (userData/laundry-offline.db) ويطبّق المخطّط. آمن للاستدعاء المتكرّر. */
 export function initDatabase(): Database.Database {
   if (db) return db;
@@ -208,6 +220,7 @@ export function initDatabase(): Database.Database {
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON"); // سلامة مرجعية
   db.exec(SCHEMA); // إنشاء الجداول إن لم توجد (idempotent)
+  migrate(db); // ترقيات الأعمدة للقواعد القائمة
   const ver = (db.prepare("select sqlite_version() v").get() as { v: string }).v;
   log.info(`SQLite ready at ${file} (sqlite ${ver})`);
   return db;
