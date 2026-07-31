@@ -27,20 +27,31 @@ See [CHANGELOG](../CHANGELOG.md) for details.
 
 ## Known limitations (honest, current)
 
-1. **Windows installer not built in the current build environment** — the NSIS/
-   portable build stalls at the winCodeSign/electron-unpack stage; the **unpacked**
-   app builds and boots. A proper build machine (Developer Mode/admin + reliable
-   tool-cache access) is required to produce and sign installers.
-2. **Auto-update has no published assets yet** — because the installer isn't built/
-   published, releases lack `latest.yml` + installer artifacts, so end-to-end update
-   delivery is unverified (the electron-updater → GitHub path itself is verified).
+1. **Installers are not code-signed** — NSIS + portable now build successfully
+   (`pnpm --filter @laundry/desktop package:win`, which runs
+   `scripts/prepare-wincodesign.mjs` first), and the exe carries correct
+   ProductName/Company/Version/icon. But without an OV/EV certificate Windows
+   SmartScreen still warns on first run. Configure `win.signtoolOptions` to sign.
+2. **Auto-update assets not published yet** — `latest.yml` is now produced by the
+   build, but no GitHub Release has the installer + `latest.yml` attached, so
+   end-to-end update *delivery* remains unverified (the electron-updater → GitHub
+   path itself is verified).
 3. **Hardware not tested** — thermal/A4/label printers, USB scanner, cash drawer, and
    live camera capture require on-site devices. Software paths are verified.
-4. **Visual UI/UX QA not automated** — must be done on screen.
+4. **Authenticated UI screens not visually QA'd** — the login screen has been
+   inspected; the rest require a manual pass on screen.
 5. **Encrypted backups are machine-bound** (DPAPI). Cross-machine restore needs a
    passphrase-based export (not implemented).
 6. **Offline scope** covers customers/orders/payments; employees and server settings
    require connectivity.
+7. **Deep pagination / newest-first listing at very large scale** — measured on a
+   1M-order local DB: an indexed lookup is 0.13 ms and a 1M-row aggregate 216 ms,
+   but `ORDER BY created_at DESC LIMIT 50` is ~333 ms and `OFFSET 500000` ~1.4 s
+   (no index on `created_at`). Not a concern at pilot volumes; revisit with an
+   index + keyset pagination before multi-year datasets.
+8. **Uninstall leaves cosmetic remnants** — an empty install directory and the
+   `.laundry`/`.invoice`/`.receipt`/`laundry-erp` extension keys (their ProgIDs
+   are removed). No functional impact.
 
 ## Future roadmap (candidate, non-committal)
 

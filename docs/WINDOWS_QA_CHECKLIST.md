@@ -60,9 +60,23 @@ actually observed.
 - CSP enforcement (external script refused) — **verified**.
 - Sync + conflict resolution — **verified** (live API + Neon).
 
+### Already verified by automation (silent install on a real machine)
+- Installer builds (NSIS + portable) and installs silently; exe metadata reads
+  ProductName "Laundry ERP" / Company "Laundry ERP" / version 1.3.0 with the
+  branded icon.
+- Desktop + Start Menu shortcuts created; uninstall registry entry present;
+  `.laundry` / `.invoice` / `.receipt` / `laundry-erp` associations registered.
+- Installed app boots: encrypted SQLite (16 tables), CSP hardened.
+- Reinstall over an existing install preserves user data (identical DB hash).
+- Uninstall removes program files, shortcuts and the registry entry; user data is
+  intentionally retained.
+
 ### Not covered by automation (must be done here)
 - All hardware rows — **NOT TESTED** (no devices in the build environment).
-- Installer/upgrade/uninstall/shortcuts/associations — **NOT VERIFIED** (installer
-  not built in the build environment).
-- Visual UI/UX (spacing, RTL, dark/light, dialogs, focus) — **NOT VERIFIED**
-  headlessly.
+- **Interactive** installer UI (wizard pages, custom install directory), repair
+  flow, and a true version-to-version upgrade (1.3.0 → 1.3.1) — **NOT VERIFIED**
+  (only silent same-version install/overwrite was automated).
+- SmartScreen behaviour — **NOT VERIFIED**; expect a warning until the installer
+  is code-signed.
+- Visual UI/UX of authenticated screens (spacing, RTL, dark/light, dialogs, focus)
+  — **NOT VERIFIED**; only the login screen has been inspected.

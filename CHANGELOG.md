@@ -4,6 +4,21 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Windows installer can now be built.** electron-builder aborted (rc=1) because
+  extracting its winCodeSign tool failed on two macOS symlinks that Windows cannot
+  create without privilege. `scripts/prepare-wincodesign.mjs` pre-populates the
+  cache with `darwin/` excluded and runs automatically before packaging, so NSIS +
+  portable installers (and `latest.yml` for auto-update) are produced.
+- **Executable identity.** With packaging unblocked, `signAndEditExecutable` is
+  enabled again, so the exe now reports ProductName "Laundry ERP", CompanyName
+  "Laundry ERP", version 1.3.0 and the branded icon instead of Electron/GitHub Inc.
+  The package description is now customer-facing (it becomes the exe's
+  FileDescription shown in Explorer and Task Manager).
+- Documentation corrected where it claimed the installer could not be built.
+
 ## [1.3.0] — 2026-07-31 — Security & Reliability Hardening
 
 Hardening pass on top of the offline platform. Desktop-only changes.

@@ -78,5 +78,12 @@ the installer artifacts **and** `latest.yml` (produced by a successful
 
 - API + Neon: live health `200`, admin login OK, live sync E2E verified.
 - Desktop: unpacked package boots, encrypted DB initializes (16 tables).
-- **NOT VERIFIED in this environment:** signed NSIS installer build; centrally
-  hosted multi-branch deployment.
+- Windows installer: NSIS + portable build (`package:win`), silent install
+  verified — correct exe metadata/icon, Desktop + Start Menu shortcuts, uninstall
+  registry entry, file associations; reinstall preserves user data; uninstall
+  removes program files, shortcuts and the registry entry while keeping user data.
+- Full commercial workflow verified against the live API (customer → order →
+  status lifecycle → payment → invoice → delivery → history → reports).
+- **NOT VERIFIED in this environment:** code-signed installer (no certificate);
+  centrally hosted multi-branch deployment; end-to-end auto-update delivery
+  (installer + `latest.yml` not attached to a GitHub Release yet).

@@ -75,11 +75,13 @@ Demo dataset (against a demo DB): `pnpm --filter @laundry/api exec tsx prisma/se
 
 ## Known limitations (honest)
 
-- The Windows installer (NSIS/portable) is **not built in the current CI/build
-  environment** (winCodeSign/electron-unpack stalls); the unpacked app builds and
-  runs. See [ROADMAP](docs/ROADMAP.md).
+- The Windows installer (NSIS + portable) **builds and installs**, but is **not
+  code-signed** — Windows SmartScreen will warn on first run until an OV/EV
+  certificate is configured. See [ROADMAP](docs/ROADMAP.md).
 - Hardware features (thermal/label printer, USB scanner, cash drawer, live camera)
   require **on-site verification** with the actual devices.
+- Authenticated UI screens have not been through a formal visual QA pass; see
+  [WINDOWS_QA_CHECKLIST](docs/WINDOWS_QA_CHECKLIST.md).
 
 ## License
 
