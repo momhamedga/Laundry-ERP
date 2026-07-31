@@ -17,6 +17,7 @@ import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
 import { addBreadcrumb, listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
 import { syncEngine } from "../services/sync-engine.js";
+import { checkForUpdates, downloadUpdate, installUpdate } from "../services/updater.js";
 import { generateBarcode, validateScan } from "../services/barcode.js";
 import { listCaptures, saveCapture } from "../services/camera.js";
 import { recordEvent } from "../db/repositories/events.repo.js";
@@ -335,6 +336,11 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   handle(INVOKE_CHANNELS.OFFLINE_QUEUE_RETRY_ALL, () => retryAllFailed());
   handle(INVOKE_CHANNELS.OFFLINE_QUEUE_DISCARD, (_e, p) => discardOp(asId(p)));
   handle(INVOKE_CHANNELS.OFFLINE_QUEUE_STATS, () => queueStats());
+
+  // ==================== Auto-update (v1.3.0) ====================
+  handle(INVOKE_CHANNELS.UPDATE_CHECK, () => checkForUpdates());
+  handle(INVOKE_CHANNELS.UPDATE_DOWNLOAD, () => downloadUpdate());
+  handle(INVOKE_CHANNELS.UPDATE_INSTALL, () => installUpdate());
 
   // ==================== Barcode / Camera / Scanner (Phase 11.6D) ====================
   const SYMBOLOGIES: BarcodeSymbology[] = ["code128", "code39", "ean13", "ean8", "upca", "qrcode"];

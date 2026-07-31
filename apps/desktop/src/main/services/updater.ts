@@ -6,37 +6,90 @@ import { EVENT_CHANNELS, type UpdateStatus } from "../../shared/ipc.js";
 const log = scoped("updater");
 
 /**
- * بنية التحديث التلقائي جاهزة (electron-updater + GitHub Releases) لكنها **معطّلة**
- * عمداً في v1.0.0 (لا فحص تلقائي، لا تنزيل). التفعيل لاحقاً: اضبط ENABLE_AUTO_UPDATE
- * وأضِف `publish` في electron-builder.yml. تُحمَّل المكتبة كسولاً عند الطلب فقط.
+ * التحديث التلقائي عبر electron-updater + GitHub Releases (v1.3.0).
+ * مُفعَّل في النسخة المُغلَّفة افتراضياً (يمكن تعطيله بـ DESKTOP_DISABLE_UPDATER=1).
+ * لا تنزيل تلقائي: نُبلّغ الواجهة عند توفّر تحديث، والمستخدم يختار Download ثم
+ * Install & Restart. المكتبة تُحمَّل كسولاً (ثقيلة) عند التفعيل فقط.
  */
-const ENABLE_AUTO_UPDATE = process.env.DESKTOP_ENABLE_UPDATER === "1";
+const DISABLED = process.env.DESKTOP_DISABLE_UPDATER === "1";
+
+// نوع مبسّط لما نحتاجه من electron-updater دون استيراد نوعه وقت الترجمة.
+type AutoUpdater = {
+  autoDownload: boolean;
+  autoInstallOnAppQuit: boolean;
+  logger: unknown;
+  on(event: string, cb: (arg: { version?: string; message?: string; percent?: number }) => void): void;
+  checkForUpdates(): Promise<unknown>;
+  downloadUpdate(): Promise<unknown>;
+  quitAndInstall(): void;
+};
+
+let updater: AutoUpdater | null = null;
+let loading: Promise<AutoUpdater | null> | null = null;
 
 function emit(status: UpdateStatus): void {
   getMainWindow()?.webContents.send(EVENT_CHANNELS.UPDATE_STATUS, status);
 }
 
-/** يُهيّئ المُحدِّث دون بدء أي فحص (Ready only). */
+/** يحمّل ويهيّئ autoUpdater مرّة واحدة (لازي). */
+async function getUpdater(): Promise<AutoUpdater | null> {
+  if (updater) return updater;
+  if (loading) return loading;
+  loading = (async () => {
+    const mod = (await import("electron-updater")) as unknown as { autoUpdater: AutoUpdater };
+    const au = mod.autoUpdater;
+    au.autoDownload = false; // المستخدم يقرّر التنزيل
+    au.autoInstallOnAppQuit = true;
+    au.logger = log;
+    au.on("checking-for-update", () => emit({ state: "checking" }));
+    au.on("update-available", (i) => emit({ state: "available", version: i.version ?? "" }));
+    au.on("update-not-available", () => emit({ state: "not-available" }));
+    au.on("download-progress", (p) => emit({ state: "downloading", percent: Math.round(p.percent ?? 0) }));
+    au.on("update-downloaded", (i) => emit({ state: "downloaded", version: i.version ?? "" }));
+    au.on("error", (e) => emit({ state: "error", message: e.message ?? String(e) }));
+    updater = au;
+    return au;
+  })();
+  return loading;
+}
+
+/** يُهيّئ المُحدِّث ويجري فحصاً أوّليّاً في النسخة المُغلَّفة. */
 export function initUpdater(): void {
-  if (!app.isPackaged || !ENABLE_AUTO_UPDATE) {
-    log.info("auto-updater is READY but disabled (v1.0.0 policy)");
+  if (!app.isPackaged || DISABLED) {
+    log.info(`auto-updater READY but inactive (packaged=${app.isPackaged}, disabled=${DISABLED})`);
     emit({ state: "disabled" });
     return;
   }
-  // مسار مستقبلي مقصود (غير مُفعَّل الآن):
-  // const { autoUpdater } = await import("electron-updater");
-  // autoUpdater.autoDownload = false;
-  // autoUpdater.on("update-available", (i) => emit({ state: "available", version: i.version }));
-  // autoUpdater.on("update-downloaded", (i) => emit({ state: "downloaded", version: i.version }));
-  // void autoUpdater.checkForUpdates();
-  log.info("auto-updater enabled path reserved (not active in v1.0.0)");
+  void getUpdater()
+    .then((au) => au?.checkForUpdates())
+    .catch((err) => {
+      log.error("initial update check failed:", err);
+      emit({ state: "error", message: err instanceof Error ? err.message : String(err) });
+    });
+  log.info("auto-updater active (github releases)");
 }
 
-/** فحص يدوي (يبقى معطّلاً افتراضياً؛ يُرجع الحالة الحالية فقط). */
-export function checkForUpdates(): UpdateStatus {
-  const status: UpdateStatus = ENABLE_AUTO_UPDATE
-    ? { state: "checking" }
-    : { state: "disabled" };
-  emit(status);
-  return status;
+/** فحص يدوي عن تحديث. */
+export async function checkForUpdates(): Promise<UpdateStatus> {
+  if (!app.isPackaged || DISABLED) return { state: "disabled" };
+  const au = await getUpdater();
+  if (!au) return { state: "disabled" };
+  emit({ state: "checking" });
+  await au.checkForUpdates();
+  return { state: "checking" };
+}
+
+/** يبدأ تنزيل التحديث المتوفّر. */
+export async function downloadUpdate(): Promise<boolean> {
+  const au = await getUpdater();
+  if (!au) return false;
+  await au.downloadUpdate();
+  return true;
+}
+
+/** يثبّت التحديث المنزَّل ويعيد التشغيل. */
+export async function installUpdate(): Promise<boolean> {
+  if (!updater) return false;
+  updater.quitAndInstall();
+  return true;
 }

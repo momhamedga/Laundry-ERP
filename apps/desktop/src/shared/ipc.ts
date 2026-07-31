@@ -59,6 +59,11 @@ export const INVOKE_CHANNELS = {
   OFFLINE_SYNC_NOW: "offline:sync:now",
   OFFLINE_SYNC_STATE: "offline:sync:state",
 
+  // Auto-update (v1.3.0)
+  UPDATE_CHECK: "update:check",
+  UPDATE_DOWNLOAD: "update:download",
+  UPDATE_INSTALL: "update:install",
+
   // Phase 11.6E — Queue management / conflict dead-letter
   OFFLINE_QUEUE_FAILED: "offline:queue:failed",
   OFFLINE_QUEUE_RETRY: "offline:queue:retry",

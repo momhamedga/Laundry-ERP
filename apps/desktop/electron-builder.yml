@@ -80,8 +80,8 @@ mac:
   category: public.app-category.business
   icon: build/icon.icns
 
-# ==================== Updater (جاهز، غير مُفعَّل في v1.0.0) ====================
-# publish:
-#   provider: github
-#   owner: <owner>
-#   repo: <repo>
+# ==================== Updater (مُفعَّل v1.3.0 عبر GitHub Releases) ====================
+publish:
+  provider: github
+  owner: momhamedga
+  repo: Laundry-ERP

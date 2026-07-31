@@ -114,6 +114,11 @@ const api = {
       invoke<CameraCapture>(INVOKE_CHANNELS.CAMERA_SAVE_CAPTURE, opts),
     listCaptures: () => invoke<CameraCapture[]>(INVOKE_CHANNELS.CAMERA_LIST_CAPTURES),
   },
+  update: {
+    check: () => invoke<UpdateStatus>(INVOKE_CHANNELS.UPDATE_CHECK),
+    download: () => invoke<boolean>(INVOKE_CHANNELS.UPDATE_DOWNLOAD),
+    install: () => invoke<boolean>(INVOKE_CHANNELS.UPDATE_INSTALL),
+  },
   offline: {
     dbStatus: () => invoke<OfflineDbStatus>(INVOKE_CHANNELS.OFFLINE_DB_STATUS),
     customers: {
