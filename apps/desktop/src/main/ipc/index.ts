@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs/promises";
 import { scoped } from "../logger.js";
 import { getMainWindow } from "../windows/main-window.js";
@@ -17,6 +17,9 @@ import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
 import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
 import { syncEngine } from "../services/sync-engine.js";
+import { generateBarcode, validateScan } from "../services/barcode.js";
+import { listCaptures, saveCapture } from "../services/camera.js";
+import { recordEvent } from "../db/repositories/events.repo.js";
 import { dbStatus } from "../db/database.js";
 import {
   createCustomer,
@@ -48,12 +51,16 @@ import type {
 } from "../../shared/ipc.js";
 import {
   INVOKE_CHANNELS,
+  EVENT_CHANNELS,
   SEND_CHANNELS,
   RENDERER_ALLOWED_KEYS_HELP,
   type AppInfo,
+  type BarcodeSymbology,
+  type GenerateBarcodeOptions,
   type IpcResult,
   type OpenFileOptions,
   type PdfExportOptions,
+  type SaveCaptureOptions,
   type SaveFileOptions,
   type SilentPrintOptions,
 } from "../../shared/ipc.js";
@@ -309,13 +316,44 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   handle(INVOKE_CHANNELS.OFFLINE_SYNC_NOW, () => syncEngine.syncNow("manual"));
   handle(INVOKE_CHANNELS.OFFLINE_SYNC_STATE, () => syncEngine.getState());
 
+  // ==================== Barcode / Camera / Scanner (Phase 11.6D) ====================
+  const SYMBOLOGIES: BarcodeSymbology[] = ["code128", "code39", "ean13", "ean8", "upca", "qrcode"];
+  handle(INVOKE_CHANNELS.BARCODE_GENERATE, (_e, p) => {
+    const o = assertObject(p);
+    if (typeof o.text !== "string") throw new Error("text is required");
+    if (!SYMBOLOGIES.includes(o.symbology as BarcodeSymbology)) {
+      throw new Error(`Invalid symbology: ${String(o.symbology)}`);
+    }
+    return generateBarcode(o as unknown as GenerateBarcodeOptions);
+  });
+  handle(INVOKE_CHANNELS.BARCODE_VALIDATE, (_e, p) => {
+    const o = assertObject(p);
+    if (typeof o.value !== "string") throw new Error("value is required");
+    return validateScan(o.value);
+  });
+  handle(INVOKE_CHANNELS.CAMERA_SAVE_CAPTURE, (_e, p) =>
+    saveCapture(assertObject(p) as unknown as SaveCaptureOptions),
+  );
+  handle(INVOKE_CHANNELS.CAMERA_LIST_CAPTURES, () => listCaptures());
+
   // ==================== One-way (renderer → main) ====================
   ipcMain.on(SEND_CHANNELS.LOG_RENDERER, (_e, level: unknown, message: unknown) => {
     const lvl = level === "error" || level === "warn" ? level : "info";
     log[lvl](`[renderer] ${String(message)}`);
   });
+  // ماسح USB (keyboard-wedge): الواجهة تلتقط القيمة الكاملة وترسلها؛ هنا نتحقّق،
+  // نسجّل الحدث محلّياً، ونبثّه لكل النوافذ لتتفاعل الشاشة النشطة (POS/الطلبات).
   ipcMain.on(SEND_CHANNELS.BARCODE_SCANNED, (_e, code: unknown) => {
-    log.info("[barcode] scanned:", String(code));
+    const result = validateScan(String(code));
+    try {
+      recordEvent("barcode-scan", result);
+    } catch (err) {
+      log.warn("failed to record scan:", err);
+    }
+    log.info(`[barcode] scanned "${result.value}" (${result.type ?? "?"}, valid=${result.valid})`);
+    for (const w of BrowserWindow.getAllWindows()) {
+      w.webContents.send(EVENT_CHANNELS.BARCODE_SCAN, result);
+    }
   });
 
   log.info("IPC handlers registered");

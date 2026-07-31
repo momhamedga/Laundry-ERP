@@ -45,10 +45,13 @@ export function hardenWebContents(contents: WebContents): void {
  * سياسات على مستوى الجلسة: رفض طلبات الأذونات الحسّاسة افتراضياً (كاميرا/ميكروفون/
  * موقع…)، والسماح فقط بما يحتاجه التطبيق (إشعارات). تصليب زائد فوق العزل/الـsandbox.
  */
+// إشعارات + الكاميرا (media) لالتقاط صور القطع/الباركود (Phase 11.6D). لا ميكروفون
+// ولا موقع ولا غيرها. الكاميرا أصل وظيفي للمغسلة (توثيق الأغراض) لا اختراق خصوصية.
+const ALLOWED_PERMISSIONS = new Set(["notifications", "media"]);
+
 export function applySessionSecurity(session: Session): void {
   session.setPermissionRequestHandler((_wc, permission, callback) => {
-    const allow = permission === "notifications";
-    callback(allow);
+    callback(ALLOWED_PERMISSIONS.has(permission));
   });
-  session.setPermissionCheckHandler((_wc, permission) => permission === "notifications");
+  session.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission));
 }

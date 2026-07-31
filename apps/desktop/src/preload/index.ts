@@ -12,7 +12,9 @@ import {
   type DesktopWindowName,
   type IpcResult,
   type CacheEntity,
+  type CameraCapture,
   type CustomerPatch,
+  type GenerateBarcodeOptions,
   type ListQuery,
   type LocalCustomer,
   type LocalOrder,
@@ -24,6 +26,8 @@ import {
   type NewPayment,
   type OfflineDbStatus,
   type OpenFileOptions,
+  type SaveCaptureOptions,
+  type ScanValidation,
   type SyncQueueItem,
   type SyncResult,
   type SyncState,
@@ -98,6 +102,17 @@ const api = {
   shortcuts: {
     list: () => invoke<ShortcutDef[]>(INVOKE_CHANNELS.SHORTCUTS_LIST),
   },
+  barcode: {
+    generate: (opts: GenerateBarcodeOptions) =>
+      invoke<string>(INVOKE_CHANNELS.BARCODE_GENERATE, opts),
+    validate: (value: string) =>
+      invoke<ScanValidation>(INVOKE_CHANNELS.BARCODE_VALIDATE, { value }),
+  },
+  camera: {
+    saveCapture: (opts: SaveCaptureOptions) =>
+      invoke<CameraCapture>(INVOKE_CHANNELS.CAMERA_SAVE_CAPTURE, opts),
+    listCaptures: () => invoke<CameraCapture[]>(INVOKE_CHANNELS.CAMERA_LIST_CAPTURES),
+  },
   offline: {
     dbStatus: () => invoke<OfflineDbStatus>(INVOKE_CHANNELS.OFFLINE_DB_STATUS),
     customers: {
@@ -167,6 +182,8 @@ const api = {
     shortcut: (cb: (action: string) => void) => subscribe<string>(EVENT_CHANNELS.SHORTCUT, cb),
     backupDone: (cb: (e: BackupEntry) => void) => subscribe<BackupEntry>(EVENT_CHANNELS.BACKUP_DONE, cb),
     syncStatus: (cb: (s: SyncState) => void) => subscribe<SyncState>(EVENT_CHANNELS.SYNC_STATUS, cb),
+    barcodeScan: (cb: (s: ScanValidation) => void) =>
+      subscribe<ScanValidation>(EVENT_CHANNELS.BARCODE_SCAN, cb),
   },
 } as const;
 

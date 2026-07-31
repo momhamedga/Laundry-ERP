@@ -59,6 +59,12 @@ export const INVOKE_CHANNELS = {
   OFFLINE_SYNC_NOW: "offline:sync:now",
   OFFLINE_SYNC_STATE: "offline:sync:state",
 
+  // Phase 11.6D — Barcode / Camera / Scanner
+  BARCODE_GENERATE: "barcode:generate",
+  BARCODE_VALIDATE: "barcode:validate",
+  CAMERA_SAVE_CAPTURE: "camera:save-capture",
+  CAMERA_LIST_CAPTURES: "camera:list-captures",
+
   DIALOG_OPEN_FILE: "dialog:open-file",
   DIALOG_SAVE_FILE: "dialog:save-file",
 
@@ -86,6 +92,7 @@ export const EVENT_CHANNELS = {
   SHORTCUT: "app:shortcut",
   BACKUP_DONE: "backup:done",
   SYNC_STATUS: "offline:sync:status",
+  BARCODE_SCAN: "barcode:scan",
 } as const;
 
 /** مفاتيح التخزين المسموح بها للـ renderer (للرسائل التشخيصية) */
@@ -400,4 +407,44 @@ export interface ListQuery {
   search?: string;
   limit?: number;
   offset?: number;
+}
+
+// ==================== Phase 11.6D — Barcode / Camera / Scanner ====================
+
+export type BarcodeSymbology = "code128" | "code39" | "ean13" | "ean8" | "upca" | "qrcode";
+
+export interface GenerateBarcodeOptions {
+  text: string;
+  symbology: BarcodeSymbology;
+  /** تكبير الوحدة (1D) */
+  scale?: number;
+  /** ارتفاع بالمليمترات (1D) */
+  height?: number;
+  /** إظهار النص أسفل الباركود (1D) */
+  includetext?: boolean;
+  /** هامش QR بالوحدات */
+  margin?: number;
+  /** عرض QR بالبكسل */
+  width?: number;
+}
+
+/** نتيجة التحقّق من رمز ممسوح (نوع مُستنتَج + صلاحية). */
+export interface ScanValidation {
+  value: string;
+  valid: boolean;
+  type: BarcodeSymbology | null;
+}
+
+export interface SaveCaptureOptions {
+  /** data:image/(png|jpeg|webp);base64,... من الواجهة (canvas.toDataURL) */
+  dataUrl: string;
+  /** وسم يُدمج في اسم الملف (مثل رقم الطلب) */
+  tag?: string;
+}
+
+export interface CameraCapture {
+  file: string;
+  name: string;
+  sizeBytes: number;
+  createdAt: string;
 }
