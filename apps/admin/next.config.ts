@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -7,6 +8,12 @@ const nextConfig: NextConfig = {
    * تشغيل dev و`next start` العاديّان لا يتأثران.
    */
   output: "standalone",
+  /**
+   * جذر تتبّع الملفات = جذر الـ monorepo، حتى يلتقط standalone كل تبعيات pnpm
+   * المرفوعة (وإلا يفشل الخادم المُجمّع بـMODULE_NOT_FOUND). يؤثّر على خرج
+   * standalone فقط - لا يمسّ dev/next start أو أي سلوك تشغيل.
+   */
+  outputFileTracingRoot: path.join(process.cwd(), "..", ".."),
 };
 
 export default nextConfig;

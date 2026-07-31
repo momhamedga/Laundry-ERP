@@ -42,9 +42,13 @@ export function bundledApiCwd(): string {
   return path.join(resourcesRoot(), "api");
 }
 
-/** مسار خادم Next standalone المُجمّع (الإنتاج): resources/renderer/server.js */
+/**
+ * مسار خادم Next standalone المُجمّع (الإنتاج). خرج standalone في monorepo يحفظ
+ * مسار مساحة العمل، فالخادم عند resources/renderer/apps/admin/server.js، وجذر
+ * التشغيل (cwd) هو جذر standalone (resources/renderer) حيث node_modules المُتتبَّعة.
+ */
 export function bundledRendererEntry(): string {
-  return path.join(resourcesRoot(), "renderer", "server.js");
+  return path.join(resourcesRoot(), "renderer", "apps", "admin", "server.js");
 }
 export function bundledRendererCwd(): string {
   return path.join(resourcesRoot(), "renderer");

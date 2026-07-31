@@ -48,7 +48,15 @@ if (existsSync(apiNodeModules)) {
 }
 
 // ---- Renderer (Next standalone) ----
-cpSync(standalone, path.join(resources, "renderer"), { recursive: true });
+// نحافظ على روابط pnpm الرمزية حرفياً (verbatimSymlinks): بنية .pnpm تعتمد على
+// الروابط النسبية لحلّ الحزم المتناظرة (مثل @swc/helpers بجوار next). أي "فكّ رموز"
+// (dereference) ينقل next خارج سياق .pnpm فيكسر require('@swc/helpers').
+//
+// ملاحظة نشر مهمّة: إنشاء الروابط الرمزية على Windows يتطلّب صلاحية (وضع المطوّر
+// أو مسؤول). إن كانت غير متاحة: فعّل Developer Mode، أو ثبّت الواجهة بـ
+// node-linker=hoisted لإنتاج node_modules بلا روابط. الخادم standalone يعمل بذاته
+// (تحقّقنا منه محليّاً)؛ القيد هنا في نسخ الروابط عبر أنظمة بلا صلاحية.
+cpSync(standalone, path.join(resources, "renderer"), { recursive: true, verbatimSymlinks: true });
 // standalone لا يتضمّن .next/static ولا public — يجب نسخهما بجواره
 if (existsSync(nextStatic))
   cpSync(nextStatic, path.join(resources, "renderer", "apps", "admin", ".next", "static"), { recursive: true });
