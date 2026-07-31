@@ -283,6 +283,16 @@ export function dbStatus(): {
   return { ok: true, path: d.name, sqliteVersion, tables, pendingSync };
 }
 
+/** مسار ملفّ القاعدة على القرص. */
+export function databaseFilePath(): string {
+  return getDb().name;
+}
+
+/** يفرّغ WAL إلى الملفّ الرئيسي (لقطة متّسقة قبل النسخ الاحتياطي). */
+export function checkpoint(): void {
+  getDb().pragma("wal_checkpoint(TRUNCATE)");
+}
+
 export function closeDatabase(): void {
   if (db) {
     db.close();

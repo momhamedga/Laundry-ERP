@@ -4,12 +4,15 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { scoped } from "../logger.js";
 import { getSettings } from "./settings.js";
+import { checkpoint, closeDatabase, initDatabase } from "../db/database.js";
 import type { BackupEntry } from "../../shared/ipc.js";
 
 const log = scoped("backup");
 
 /** ملفّات بيانات سطح المكتب المحليّة المشمولة بالنسخ (JSON من electron-store). */
 const DATA_FILES = ["desktop-settings.json", "desktop-config.json"];
+/** ملفّ قاعدة SQLite المشفّرة (يُضمَّن كـ base64 — يحوي العملاء/الطلبات/المدفوعات). */
+const SQLITE_FILE = "laundry-offline.db";
 const MAGIC = "LAUNDRY_DESKTOP_BACKUP_V1";
 
 function backupDir(): string {
@@ -34,9 +37,27 @@ function collectData(): Record<string, unknown> {
   return out;
 }
 
+/** يلتقط قاعدة SQLite (بعد wal_checkpoint) كـ base64 لإدراجها في النسخة. */
+function collectSqlite(): string | undefined {
+  const file = path.join(app.getPath("userData"), SQLITE_FILE);
+  if (!fs.existsSync(file)) return undefined;
+  try {
+    checkpoint(); // لقطة متّسقة: فرّغ WAL إلى الملفّ الرئيسي
+  } catch {
+    /* القاعدة قد لا تكون مفتوحة بعد */
+  }
+  return fs.readFileSync(file).toString("base64");
+}
+
 /** ينشئ نسخة مضغوطة (gzip) موقّعة. يُطبّق سياسة الاحتفاظ بعدها. */
 export function runBackup(kind: BackupEntry["kind"]): BackupEntry {
-  const payload = { magic: MAGIC, kind, createdAt: new Date().toISOString(), data: collectData() };
+  const payload = {
+    magic: MAGIC,
+    kind,
+    createdAt: new Date().toISOString(),
+    data: collectData(),
+    sqlite: collectSqlite(), // قاعدة العملاء/الطلبات/المدفوعات (مشفّرة)
+  };
   const gz = zlib.gzipSync(Buffer.from(JSON.stringify(payload), "utf8"));
   const stamp = payload.createdAt.replace(/[:.]/g, "-");
   const file = path.join(backupDir(), `${kind}-${stamp}.json.gz`);
@@ -63,7 +84,7 @@ export function listBackups(): BackupEntry[] {
 export function restoreBackup(file: string): string[] {
   if (!fs.existsSync(file)) throw new Error("Backup file not found");
   const raw = zlib.gunzipSync(fs.readFileSync(file)).toString("utf8");
-  const parsed = JSON.parse(raw) as { magic?: string; data?: Record<string, unknown> };
+  const parsed = JSON.parse(raw) as { magic?: string; data?: Record<string, unknown>; sqlite?: string };
   if (parsed.magic !== MAGIC || typeof parsed.data !== "object" || parsed.data === null) {
     throw new Error("Invalid or corrupted backup file");
   }
@@ -74,6 +95,20 @@ export function restoreBackup(file: string): string[] {
     fs.writeFileSync(path.join(userData, name), JSON.stringify(content, null, 2), "utf8");
     restored.push(name);
   }
+
+  // استرجاع قاعدة SQLite: أغلقها، اكتب البايتات، احذف WAL/SHM القديمة، ثم أعِد الفتح.
+  // ملاحظة: القاعدة مشفّرة بمفتاح الجهاز (DPAPI) — الاسترجاع على نفس المستخدم/الجهاز.
+  if (typeof parsed.sqlite === "string") {
+    closeDatabase();
+    const dbPath = path.join(userData, SQLITE_FILE);
+    fs.writeFileSync(dbPath, Buffer.from(parsed.sqlite, "base64"));
+    for (const ext of ["-wal", "-shm"]) {
+      if (fs.existsSync(dbPath + ext)) fs.rmSync(dbPath + ext);
+    }
+    initDatabase(); // أعِد الفتح بالمفتاح المختوم
+    restored.push(SQLITE_FILE);
+  }
+
   log.info("backup restored:", restored.join(", "));
   return restored;
 }
