@@ -48,19 +48,17 @@ win:
       arch: [x64]
   icon: build/icon.ico
   artifactName: ${productName}-${version}-${arch}.${ext}
-  # تخطّي تعديل/توقيع الـexe عبر rcedit: يتطلّب أداة winCodeSign التي تحوي روابط
-  # رمزية macOS لا تُستخرَج على Windows بلا صلاحية (وضع المطوّر/مسؤول). إبقاؤه false
-  # يجعل البناء يعمل على أي جهاز Windows.
+  # تضمين الأيقونة وبيانات الإصدار (ProductName/CompanyName/Copyright/Version) في
+  # موارد الـexe عبر rcedit — وهي ما يقرأه Explorer وTask Manager وSmartScreen.
   #
-  # ⚠️ تحقّق فعلي (Phase 12.2): تجربة تفعيل true هنا أفشلت التغليف بالكامل (rc=1) —
-  # في electron-builder 25.1.8، تضمين الأيقونة/VersionInfo عبر rcedit والتوقيع
-  # مرتبطان بنفس المسار المحكوم بهذا العلم؛ signWindows() يستدعي دوماً winCodeSign
-  # لملف الـexe الرئيسي حتى بلا شهادة مُهيَّأة، فيفشل على نفس مشكلة الروابط الرمزية.
-  # لا تُفعِّله إلا على جهاز بوضع المطوّر/صلاحية Admin (لاستخراج winCodeSign) أو بعد
-  # شراء شهادة توقيع حقيقية. النتيجة: أيقونة exe الافتراضية والـVersionInfo تبقى
-  # أيقونة Electron العامة حتى يُبنى على جهاز كهذا؛ أيقونة NSIS/الاختصارات مضبوطة
-  # عبر build/icon.ico بغضّ النظر (win.icon أدناه).
-  signAndEditExecutable: false
+  # يتطلّب أداة winCodeSign في كاش electron-builder. أرشيفها يحوي روابط رمزية لـ
+  # macOS لا تُستخرَج على Windows بلا صلاحية، فيفشل التغليف بالكامل (rc=1) حتى بلا
+  # شهادة توقيع. الحلّ: scripts/prepare-wincodesign.mjs يستخرجها مستثنياً darwin/
+  # ويُشغَّل تلقائياً ضمن package:win / dist / package:dir (Phase 12.3).
+  #
+  # التوقيع نفسه يُتخطّى بأمان بلا شهادة ("no signing info identified") ولا يُفشِل
+  # البناء. لتوقيع حقيقي أضِف شهادة عبر win.signtoolOptions.
+  signAndEditExecutable: true
 
 nsis:
   oneClick: false

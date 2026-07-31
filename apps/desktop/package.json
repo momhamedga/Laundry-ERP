@@ -2,7 +2,7 @@
   "name": "@laundry/desktop",
   "version": "1.3.0",
   "private": true,
-  "description": "Laundry ERP - Enterprise Desktop (Electron shell for the Next.js Admin + local API)",
+  "description": "Laundry ERP — Enterprise laundry management",
   "main": "dist/main/index.js",
   "author": "Laundry ERP",
   "scripts": {
@@ -14,11 +14,12 @@
     "lint": "eslint \"src/**/*.ts\"",
     "start": "pnpm run build && electron .",
     "dev": "cross-env DESKTOP_ENV=development pnpm run build && cross-env DESKTOP_ENV=development electron .",
-    "package": "pnpm run build && electron-builder --publish never",
-    "dist": "node scripts/prepare-resources.mjs && pnpm run build && electron-builder --win --publish never",
-    "package:win": "pnpm run build && electron-builder --win --publish never",
+    "prepare:wincodesign": "node scripts/prepare-wincodesign.mjs",
+    "package": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --publish never",
+    "dist": "node scripts/prepare-resources.mjs && pnpm run build && pnpm run prepare:wincodesign && electron-builder --win --publish never",
+    "package:win": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --win --publish never",
     "package:linux": "pnpm run build && electron-builder --linux --publish never",
-    "package:dir": "pnpm run build && electron-builder --dir --publish never"
+    "package:dir": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --dir --publish never"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
