@@ -5,6 +5,29 @@ import { scoped } from "./logger.js";
 const log = scoped("security");
 
 /**
+ * سياسة أمان المحتوى (CSP) — دفاع في العمق فوق العزل/الـsandbox (v1.3.0).
+ * تمنع تحميل أي سكربت/اتّصال/كائن من مضيف خارجي: script/connect محصورة في
+ * الأصول المحلّية المعروفة (الواجهة + الـAPI المحلي + WS للتطوير). يُسمح بـ
+ * inline/eval لأن Next.js يحتاجهما للترطيب، لكن لا مضيف خارجي إطلاقاً (يقطع RCE
+ * عن بُعد عبر حقن سكربت). object/frame-ancestors ممنوعة.
+ */
+function buildCsp(): string {
+  const origins = allowedNavigationOrigins().join(" ");
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self' ${origins} ws: wss:`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+/**
  * تصليب أمني على مستوى webContents (يُطبَّق على كل نافذة):
  * - منع فتح نوافذ جديدة داخلياً؛ الروابط الخارجية تُفتح بالمتصفح الافتراضي بأمان.
  * - منع أي navigation خارج الأصول المسموح بها (renderer/api المحلي فقط).
@@ -54,4 +77,17 @@ export function applySessionSecurity(session: Session): void {
     callback(ALLOWED_PERMISSIONS.has(permission));
   });
   session.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission));
+
+  // حقن رأس CSP على كل استجابة (دفاع في العمق) — v1.3.0
+  const csp = buildCsp();
+  session.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    // أزل أي CSP سابق ثم اضبط سياستنا (تفادي التعارض)
+    for (const k of Object.keys(responseHeaders)) {
+      if (k.toLowerCase() === "content-security-policy") delete responseHeaders[k];
+    }
+    responseHeaders["Content-Security-Policy"] = [csp];
+    callback({ responseHeaders });
+  });
+  log.info("session hardened (permissions + CSP)");
 }
