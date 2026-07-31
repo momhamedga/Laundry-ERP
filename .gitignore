@@ -25,6 +25,11 @@ apps/desktop/dist/
 apps/desktop/release/
 resources/api/
 resources/renderer/
+# استثناء: apps/desktop/build/ ليست مخرجات — أصول مصدرية ثابتة يقرأها
+# electron-builder (أيقونات NSIS/الاختصارات/التطبيق: icon.ico/icon.png/icon.icns)
+# ويجب أن تُتتبَّع. القاعدة العامة build/ أعلاه (سطر 16) تُقصيها افتراضياً.
+!apps/desktop/build/
+!apps/desktop/build/**
 
 # ==================== Test / Coverage ====================
 coverage/

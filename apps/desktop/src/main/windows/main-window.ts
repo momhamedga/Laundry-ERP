@@ -1,6 +1,6 @@
 import { BrowserWindow, nativeTheme } from "electron";
 import path from "node:path";
-import { IS_DEV } from "../config.js";
+import { IS_DEV, appIconPath } from "../config.js";
 import { scoped } from "../logger.js";
 import { hardenWebContents } from "../security.js";
 import { getSetting } from "../storage.js";
@@ -40,6 +40,7 @@ export function createMainWindow(rendererUrl: string): BrowserWindow {
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#26262b" : "#f7f7fb",
     title: "نظام إدارة المغاسل",
+    icon: appIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: PRELOAD_PATH,

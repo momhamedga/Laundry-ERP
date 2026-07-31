@@ -56,3 +56,16 @@ export function bundledRendererCwd(): string {
 
 export const APP_PROTOCOL = "laundry-erp"; // Deep-linking ready: laundry-erp://...
 export const SINGLE_INSTANCE = true;
+
+/**
+ * مسار أيقونة التطبيق (Phase 12.2) — تُستخدم لضبط أيقونة نوافذ Electron وقت
+ * التشغيل (شريط المهام + عنوان النافذة)، بمعزل عن تضمين الأيقونة داخل موارد
+ * ملفّ الـexe نفسه (الذي يتطلّب rcedit/signAndEditExecutable، معطَّل حالياً - راجع
+ * electron-builder.yml). مُغلَّفة: resources/build/icon.*؛ تطوير: apps/desktop/build/icon.*.
+ */
+export function appIconPath(): string {
+  const file = process.platform === "win32" ? "icon.ico" : "icon.png";
+  return IS_DEV
+    ? path.resolve(__dirname, "..", "..", "build", file)
+    : path.join(process.resourcesPath, "build", file);
+}

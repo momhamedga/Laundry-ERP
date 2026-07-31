@@ -1,4 +1,5 @@
 import { BrowserWindow } from "electron";
+import { appIconPath } from "../config.js";
 
 /**
  * شاشة بداية خفيفة (frameless) تُعرض فوراً أثناء إقلاع الـ API والـ renderer،
@@ -39,6 +40,7 @@ export function createSplashWindow(): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: true,
     backgroundColor: "#0b1020",
+    icon: appIconPath(),
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   void splash.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(SPLASH_HTML)}`);

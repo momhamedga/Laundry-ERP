@@ -1,6 +1,6 @@
 import { BrowserWindow } from "electron";
 import path from "node:path";
-import { IS_DEV } from "../config.js";
+import { IS_DEV, appIconPath } from "../config.js";
 import { scoped } from "../logger.js";
 import { hardenWebContents } from "../security.js";
 import type { DesktopWindowName } from "../../shared/ipc.js";
@@ -43,6 +43,7 @@ export function openWindow(name: DesktopWindowName): void {
     height: cfg.height,
     title: cfg.title,
     show: false,
+    icon: appIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: PRELOAD_PATH,

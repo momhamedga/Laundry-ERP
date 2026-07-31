@@ -24,6 +24,13 @@ import { EVENT_CHANNELS } from "../shared/ipc.js";
 
 const log = scoped("main");
 
+// هوية التطبيق على ويندوز (تجميع شريط المهام + اسم مُرسِل الإشعارات الصحيح؛
+// بلا هذا قد تظهر الإشعارات باسم "Electron" بدل "Laundry ERP"). يطابق appId في
+// electron-builder.yml. مستقلّ عن signAndEditExecutable (Phase 12.2).
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.laundryerp.desktop");
+}
+
 const backend = new BackendManager();
 const renderer = new RendererServer();
 const network = new NetworkMonitor();
