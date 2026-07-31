@@ -1,6 +1,6 @@
 {
   "name": "@laundry/desktop",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Laundry ERP - Enterprise Desktop (Electron shell for the Next.js Admin + local API)",
   "main": "dist/main/index.js",

@@ -4,6 +4,42 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-07-31 — Security & Reliability Hardening
+
+Hardening pass on top of the offline platform. Desktop-only changes.
+
+### Added
+- **Encryption at rest** — the offline SQLite database is now encrypted
+  (SQLCipher via better-sqlite3-multiple-ciphers). The 256-bit key is generated
+  once and sealed with the OS keystore (DPAPI on Windows) — never written raw to
+  disk. A legacy plaintext DB is auto-backed-up to `*.legacy` and replaced with a
+  fresh encrypted one (no crash, no data mixing).
+- **Content-Security-Policy** — a CSP is injected for the renderer session:
+  script/connect restricted to local origins (blocks remote-code-via-injection),
+  inline/eval allowed for Next.js, object/frame-ancestors denied.
+- **Auto-update** — electron-updater wired to GitHub Releases (active in the
+  packaged app). Notifies the renderer on an available update; the user chooses
+  Download, then Install & Restart. IPC: `desktop.update.check/download/install`.
+- **Crash analytics** — crash reports now embed a 40-entry user-action breadcrumb
+  trail and the native minidump directory alongside stack, version, and system
+  info.
+
+### Fixed
+- **Backup now includes the offline database.** Previously only two JSON settings
+  files were backed up; all customers/orders/payments (the SQLite DB) were
+  omitted, so a backup before sync silently lost offline data. Backups now embed
+  the WAL-checkpointed DB and restore it (same Windows user/machine, since the
+  key is DPAPI-sealed).
+
+### Notes / Known limitations
+- Physical hardware (thermal/A4/label printers, USB scanner, cash drawer, live
+  camera capture) was **not** tested — no devices in the build environment.
+- The Windows installer (NSIS/portable) could **not** be built in this
+  environment (winCodeSign/electron unpack stalls); the unpacked app builds and
+  runs. Auto-update therefore has no published `latest.yml`/installer assets yet.
+- Admin UI visual QA under CSP was not performed headlessly (UI unchanged from
+  v1.0.0; static Tailwind checks were clean).
+
 ## [1.2.0] — 2026-07-31 — Enterprise Offline Edition
 
 The desktop app now works **fully offline** and **auto-syncs** when connectivity
