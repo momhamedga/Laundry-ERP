@@ -19,6 +19,13 @@ out/
 .turbo/
 *.tsbuildinfo
 
+# ==================== Electron / Desktop ====================
+# مخرجات بناء وتغليف قشرة سطح المكتب (تُولَّد من مصادر أخرى)
+apps/desktop/dist/
+apps/desktop/release/
+resources/api/
+resources/renderer/
+
 # ==================== Test / Coverage ====================
 coverage/
 coverage-integration/

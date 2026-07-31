@@ -1,0 +1,38 @@
+{
+  "name": "@laundry/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Laundry ERP - Enterprise Desktop (Electron shell for the Next.js Admin + local API)",
+  "main": "dist/main/index.js",
+  "author": "Laundry ERP",
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:main": "tsc -p tsconfig.json",
+    "build:preload": "node scripts/build-preload.mjs",
+    "build": "pnpm run clean && pnpm run build:main && pnpm run build:preload",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\"",
+    "start": "pnpm run build && electron .",
+    "dev": "cross-env DESKTOP_ENV=development pnpm run build && cross-env DESKTOP_ENV=development electron .",
+    "package": "pnpm run build && electron-builder --publish never",
+    "package:win": "pnpm run build && electron-builder --win --publish never",
+    "package:linux": "pnpm run build && electron-builder --linux --publish never",
+    "package:dir": "pnpm run build && electron-builder --dir --publish never"
+  },
+  "dependencies": {
+    "electron-log": "^5.2.0",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^24.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
+    "eslint": "^9.18.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}

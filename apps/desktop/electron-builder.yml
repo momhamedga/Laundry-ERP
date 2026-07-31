@@ -1,0 +1,70 @@
+appId: com.laundryerp.desktop
+productName: Laundry ERP
+copyright: Copyright © 2026 Laundry ERP
+
+directories:
+  output: release
+  buildResources: build
+
+# ملفّات التطبيق داخل asar (الـ main + preload المُترجَمان + تبعيات Electron فقط)
+files:
+  - dist/**/*
+  - package.json
+
+# موارد خارجية تُشغَّل كعمليات Node مدمجة (لا داخل asar): الـ API المبني وواجهة
+# Next standalone. تُنسخ من مخرجات البناء قبل التغليف (انظر README).
+extraResources:
+  - from: ../../resources/api
+    to: api
+    filter: ["**/*"]
+  - from: ../../resources/renderer
+    to: renderer
+    filter: ["**/*"]
+  - from: build
+    to: build
+    filter: ["icon.*"]
+
+asar: true
+compression: normal
+
+# ==================== Windows ====================
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Laundry ERP
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+# ==================== Linux ====================
+linux:
+  target:
+    - AppImage
+  category: Office
+  icon: build/icon.png
+  artifactName: ${productName}-${version}.${ext}
+
+# ==================== macOS (Ready — يُبنى على جهاز macOS فقط) ====================
+mac:
+  target:
+    - dmg
+  category: public.app-category.business
+  icon: build/icon.icns
+
+# ==================== Updater (جاهز، غير مُفعَّل في v1.0.0) ====================
+# publish:
+#   provider: github
+#   owner: <owner>
+#   repo: <repo>
