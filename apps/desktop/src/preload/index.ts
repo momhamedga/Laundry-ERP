@@ -12,6 +12,7 @@ import {
   type DesktopWindowName,
   type IpcResult,
   type NetStatus,
+  type OfflineDbStatus,
   type OpenFileOptions,
   type PdfExportOptions,
   type PrinterInfo,
@@ -83,6 +84,9 @@ const api = {
   },
   shortcuts: {
     list: () => invoke<ShortcutDef[]>(INVOKE_CHANNELS.SHORTCUTS_LIST),
+  },
+  offline: {
+    dbStatus: () => invoke<OfflineDbStatus>(INVOKE_CHANNELS.OFFLINE_DB_STATUS),
   },
   dialog: {
     openFile: (opts?: OpenFileOptions) => invoke<string[]>(INVOKE_CHANNELS.DIALOG_OPEN_FILE, opts),

@@ -39,6 +39,8 @@ export const INVOKE_CHANNELS = {
 
   SHORTCUTS_LIST: "shortcuts:list",
 
+  OFFLINE_DB_STATUS: "offline:db-status",
+
   DIALOG_OPEN_FILE: "dialog:open-file",
   DIALOG_SAVE_FILE: "dialog:save-file",
 
@@ -224,4 +226,13 @@ export interface ShortcutDef {
   id: string;
   accelerator: string;
   description: string;
+}
+
+/** حالة قاعدة SQLite المحلّية (Phase 11.6A) */
+export interface OfflineDbStatus {
+  ok: boolean;
+  path: string;
+  sqliteVersion: string;
+  tables: number;
+  pendingSync: number;
 }

@@ -16,6 +16,7 @@ import { getSettings, updateSettings } from "../services/settings.js";
 import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
 import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
+import { dbStatus } from "../db/database.js";
 import type { BackendManager } from "../services/backend-manager.js";
 import type { NetworkMonitor } from "../services/network.js";
 import type {
@@ -223,6 +224,9 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   handle(INVOKE_CHANNELS.CRASH_LIST, () => listCrashReports());
   handle(INVOKE_CHANNELS.CRASH_OPEN_DIR, () => (openCrashDir(), true));
   handle(INVOKE_CHANNELS.SHORTCUTS_LIST, () => listShortcuts());
+
+  // ==================== Offline (Phase 11.6A): حالة قاعدة SQLite ====================
+  handle(INVOKE_CHANNELS.OFFLINE_DB_STATUS, () => dbStatus());
 
   // ==================== One-way (renderer → main) ====================
   ipcMain.on(SEND_CHANNELS.LOG_RENDERER, (_e, level: unknown, message: unknown) => {

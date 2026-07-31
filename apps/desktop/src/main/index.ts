@@ -16,6 +16,7 @@ import { applyStartupSettings } from "./services/settings.js";
 import { backupOnExitIfEnabled, runBackup, startBackupSchedules, stopBackupSchedules } from "./services/backup.js";
 import { registerShortcuts } from "./services/shortcuts.js";
 import { closeAllExtraWindows, openWindow, setRendererBase } from "./windows/windows-manager.js";
+import { closeDatabase, dbStatus, initDatabase } from "./db/database.js";
 import { registerIpc } from "./ipc/index.js";
 import { EVENT_CHANNELS } from "../shared/ipc.js";
 
@@ -94,6 +95,13 @@ async function onReady(): Promise<void> {
   initLogging();
   initCrashReporter();
   applyStartupSettings();
+  try {
+    initDatabase(); // Phase 11.6A: قاعدة SQLite المحلّية
+    const s = dbStatus();
+    log.info(`offline DB ready — ${s.tables} tables, sqlite ${s.sqliteVersion}, pending=${s.pendingSync}`);
+  } catch (err) {
+    log.error("offline DB init failed:", err);
+  }
   applySessionSecurity(session.defaultSession);
   buildAppMenu();
 
@@ -186,6 +194,7 @@ async function cleanup(): Promise<void> {
   closeAllExtraWindows();
   network.stop();
   destroyTray();
+  closeDatabase(); // إغلاق SQLite نظيفاً
   await Promise.allSettled([backend.stop(), renderer.stop()]);
   log.info("cleanup done");
 }
