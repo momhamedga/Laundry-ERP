@@ -180,6 +180,8 @@ const api = {
   log: (level: "info" | "warn" | "error", message: string) =>
     ipcRenderer.send(SEND_CHANNELS.LOG_RENDERER, level, message),
   notifyScan: (code: string) => ipcRenderer.send(SEND_CHANNELS.BARCODE_SCANNED, code),
+  /** يسجّل إجراء المستخدم في أثر تتبّع الأعطال (breadcrumb) */
+  breadcrumb: (action: string) => ipcRenderer.send(SEND_CHANNELS.CRASH_BREADCRUMB, action),
   on: {
     backendStatus: (cb: (s: BackendStatus) => void) =>
       subscribe<BackendStatus>(EVENT_CHANNELS.BACKEND_STATUS_CHANGED, cb),

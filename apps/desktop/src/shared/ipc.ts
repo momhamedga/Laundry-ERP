@@ -88,6 +88,7 @@ export const INVOKE_CHANNELS = {
 export const SEND_CHANNELS = {
   LOG_RENDERER: "log:renderer",
   BARCODE_SCANNED: "barcode:scanned",
+  CRASH_BREADCRUMB: "crash:breadcrumb",
 } as const;
 
 /** قنوات البثّ (main → renderer عبر webContents.send) */

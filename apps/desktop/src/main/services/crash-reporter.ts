@@ -13,6 +13,30 @@ function crashDir(): string {
   return dir;
 }
 
+// ==================== أثر إجراءات المستخدم (breadcrumbs) — v1.3.0 ====================
+// حلقة بآخر الإجراءات (تنقّل/عمليات) تُرفَق بتقرير العطل لإعادة بناء ما فعله المستخدم.
+interface Breadcrumb {
+  at: string;
+  action: string;
+}
+const BREADCRUMB_MAX = 40;
+const breadcrumbs: Breadcrumb[] = [];
+
+/** يسجّل إجراء مستخدم/نظام في أثر التتبّع (يُقصّ إلى آخر 40). */
+export function addBreadcrumb(action: string): void {
+  breadcrumbs.push({ at: new Date().toISOString(), action: String(action).slice(0, 200) });
+  if (breadcrumbs.length > BREADCRUMB_MAX) breadcrumbs.shift();
+}
+
+/** مسار مقالب الأعطال الأصلية (minidumps) التي يكتبها Crashpad. */
+function minidumpDir(): string {
+  try {
+    return app.getPath("crashDumps");
+  } catch {
+    return "";
+  }
+}
+
 /** يفعّل مُبلِّغ الأعطال محليّاً فقط (لا رفع لأي خدمة خارجية). */
 export function initCrashReporter(): void {
   crashReporter.start({
@@ -49,6 +73,8 @@ export function writeRendererCrash(details: RenderProcessGoneDetails): void {
     reason: details.reason,
     exitCode: details.exitCode,
     system: systemInfo(),
+    breadcrumbs: [...breadcrumbs],
+    minidumpDir: minidumpDir(),
   };
   const file = path.join(crashDir(), `renderer-${time.replace(/[:.]/g, "-")}.json`);
   try {
@@ -68,6 +94,8 @@ export function writeMainCrash(err: unknown): void {
     reason: err instanceof Error ? err.message : String(err),
     stack: err instanceof Error ? err.stack : undefined,
     system: systemInfo(),
+    breadcrumbs: [...breadcrumbs],
+    minidumpDir: minidumpDir(),
   };
   const file = path.join(crashDir(), `main-${time.replace(/[:.]/g, "-")}.json`);
   try {

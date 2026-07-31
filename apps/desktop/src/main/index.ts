@@ -11,7 +11,7 @@ import { buildAppMenu } from "./services/menu.js";
 import { createTray, destroyTray, refreshTray } from "./services/tray.js";
 import { notify, notifyEvent } from "./services/notifications.js";
 import { initUpdater } from "./services/updater.js";
-import { initCrashReporter, writeMainCrash } from "./services/crash-reporter.js";
+import { addBreadcrumb, initCrashReporter, writeMainCrash } from "./services/crash-reporter.js";
 import { applyStartupSettings } from "./services/settings.js";
 import { backupOnExitIfEnabled, runBackup, startBackupSchedules, stopBackupSchedules } from "./services/backup.js";
 import { registerShortcuts } from "./services/shortcuts.js";
@@ -160,7 +160,10 @@ async function onReady(): Promise<void> {
   registerIpc({ backend, network });
 
   // Phase 11.6C: بثّ حالة المزامنة للواجهة + بدء المزامنة الدورية إن كانت مُفعّلة
-  syncEngine.on("status", (s) => win.webContents.send(EVENT_CHANNELS.SYNC_STATUS, s));
+  syncEngine.on("status", (s) => {
+    win.webContents.send(EVENT_CHANNELS.SYNC_STATUS, s);
+    if (s.lastResult) addBreadcrumb(`sync:done ${s.lastResult.done}/${s.lastResult.processed}`);
+  });
   const syncCfg = getSettings().sync;
   if (syncCfg.enabled) syncEngine.startAuto(syncCfg.intervalSec);
 
@@ -183,6 +186,7 @@ async function onReady(): Promise<void> {
   });
   network.on("status", (s) => {
     win.webContents.send(EVENT_CHANNELS.NET_STATUS_CHANGED, s);
+    addBreadcrumb(`network:${s}`); // أثر للأعطال
     refreshTray(); // حدّث تسمية "المزامنة" في قائمة الـ tray
     if (s === "offline") notify("غير متصل", "فُقد الاتصال بالخادم المحلي. جارٍ إعادة المحاولة…");
     if (s === "online") {

@@ -14,7 +14,7 @@ import { openCashDrawer } from "../services/cash-drawer.js";
 import { closeWindow, focusWindow, openWindow } from "../windows/windows-manager.js";
 import { getSettings, updateSettings } from "../services/settings.js";
 import { listBackups, restoreBackup, runBackup } from "../services/backup.js";
-import { listCrashReports, openCrashDir } from "../services/crash-reporter.js";
+import { addBreadcrumb, listCrashReports, openCrashDir } from "../services/crash-reporter.js";
 import { listShortcuts } from "../services/shortcuts.js";
 import { syncEngine } from "../services/sync-engine.js";
 import { generateBarcode, validateScan } from "../services/barcode.js";
@@ -363,6 +363,9 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   });
   // ماسح USB (keyboard-wedge): الواجهة تلتقط القيمة الكاملة وترسلها؛ هنا نتحقّق،
   // نسجّل الحدث محلّياً، ونبثّه لكل النوافذ لتتفاعل الشاشة النشطة (POS/الطلبات).
+  ipcMain.on(SEND_CHANNELS.CRASH_BREADCRUMB, (_e, action: unknown) => {
+    addBreadcrumb(String(action));
+  });
   ipcMain.on(SEND_CHANNELS.BARCODE_SCANNED, (_e, code: unknown) => {
     const result = validateScan(String(code));
     try {
