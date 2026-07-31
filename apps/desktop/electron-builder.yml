@@ -36,6 +36,11 @@ win:
       arch: [x64]
   icon: build/icon.ico
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # تخطّي تعديل/توقيع الـexe عبر rcedit: يتطلّب أداة winCodeSign التي تحوي روابط
+  # رمزية macOS لا تُستخرَج على Windows بلا صلاحية (وضع المطوّر/مسؤول). إبقاؤه false
+  # يجعل البناء يعمل على أي جهاز Windows. أعِده إلى true على جهاز توقيع/وضع مطوّر
+  # مع إضافة build/icon.ico لدمج الأيقونة/التوقيع في الـexe.
+  signAndEditExecutable: false
 
 nsis:
   oneClick: false

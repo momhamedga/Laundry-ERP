@@ -15,6 +15,7 @@
     "start": "pnpm run build && electron .",
     "dev": "cross-env DESKTOP_ENV=development pnpm run build && cross-env DESKTOP_ENV=development electron .",
     "package": "pnpm run build && electron-builder --publish never",
+    "dist": "node scripts/prepare-resources.mjs && pnpm run build && electron-builder --win --publish never",
     "package:win": "pnpm run build && electron-builder --win --publish never",
     "package:linux": "pnpm run build && electron-builder --linux --publish never",
     "package:dir": "pnpm run build && electron-builder --dir --publish never"
