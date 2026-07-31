@@ -1,7 +1,9 @@
-import Database from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
 import { app } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { scoped } from "../logger.js";
+import { getOrCreateDbKey } from "./db-key.js";
 
 const log = scoped("sqlite");
 
@@ -211,18 +213,45 @@ function migrate(d: Database.Database): void {
   ensureColumn(d, "sync_queue", "next_attempt_at", "next_attempt_at TEXT");
 }
 
+/**
+ * يفتح قاعدة مشفّرة بالمفتاح (SQLCipher عبر better-sqlite3-multiple-ciphers). يتحقّق
+ * من فكّ التشفير بقراءة sqlite_master؛ وإن فشل على ملفّ قديم غير مشفّر (نصّ صريح من
+ * قبل تفعيل التشفير) ينقله إلى نسخة .legacy ويبدأ قاعدة مشفّرة جديدة (بلا تعطّل).
+ */
+function openEncrypted(file: string, key: string): Database.Database {
+  const d = new Database(file);
+  d.pragma(`key='${key}'`); // يجب أن يسبق أي عملية أخرى
+  try {
+    d.prepare("SELECT count(*) FROM sqlite_master").get(); // يُفعّل فحص فكّ التشفير
+    return d;
+  } catch {
+    d.close();
+    if (fs.existsSync(file)) {
+      const bak = `${file}.legacy-${Date.now()}`;
+      fs.renameSync(file, bak);
+      for (const ext of ["-wal", "-shm"]) {
+        if (fs.existsSync(file + ext)) fs.renameSync(file + ext, bak + ext);
+      }
+      log.warn(`existing DB not readable with key (legacy plaintext?) → backed up: ${path.basename(bak)}`);
+    }
+    const fresh = new Database(file);
+    fresh.pragma(`key='${key}'`);
+    return fresh;
+  }
+}
+
 /** يفتح القاعدة (userData/laundry-offline.db) ويطبّق المخطّط. آمن للاستدعاء المتكرّر. */
 export function initDatabase(): Database.Database {
   if (db) return db;
   const file = path.join(app.getPath("userData"), "laundry-offline.db");
-  db = new Database(file);
+  db = openEncrypted(file, getOrCreateDbKey()); // مشفّرة عند السكون (DPAPI-sealed key)
   db.pragma("journal_mode = WAL"); // كتابة متزامنة أفضل
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON"); // سلامة مرجعية
   db.exec(SCHEMA); // إنشاء الجداول إن لم توجد (idempotent)
   migrate(db); // ترقيات الأعمدة للقواعد القائمة
   const ver = (db.prepare("select sqlite_version() v").get() as { v: string }).v;
-  log.info(`SQLite ready at ${file} (sqlite ${ver})`);
+  log.info(`SQLite ready (encrypted) at ${file} (sqlite ${ver})`);
   return db;
 }
 
