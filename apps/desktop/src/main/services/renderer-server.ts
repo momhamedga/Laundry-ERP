@@ -3,6 +3,7 @@ import fs from "node:fs";
 import {
   DEV_RENDERER_URL,
   IS_DEV,
+  PROD_RENDERER_HOST,
   PROD_RENDERER_PORT,
   PROD_RENDERER_URL,
   bundledRendererCwd,
@@ -41,7 +42,9 @@ export class RendererServer {
         ELECTRON_RUN_AS_NODE: "1",
         NODE_ENV: "production",
         PORT: String(PROD_RENDERER_PORT),
-        HOSTNAME: "127.0.0.1",
+        // يجب أن يطابق مضيف PROD_RENDERER_URL (localhost) وإلا فشل الاتصال عند
+        // اختلاف تحويل localhost إلى ::1 بدل 127.0.0.1 — راجع التعليق في config.ts
+        HOSTNAME: PROD_RENDERER_HOST,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

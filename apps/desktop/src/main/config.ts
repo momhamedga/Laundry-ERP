@@ -18,9 +18,18 @@ export const API_ORIGIN = `http://127.0.0.1:${API_PORT}`;
 export const DEV_RENDERER_URL =
   process.env.DESKTOP_RENDERER_URL ?? "http://localhost:3000";
 
-/** منفذ الـ Renderer المُضمَّن (Next standalone) في الإنتاج */
+/**
+ * منفذ الـ Renderer المُضمَّن (Next standalone) في الإنتاج.
+ *
+ * ⚠️ المضيف هنا **localhost** وليس 127.0.0.1 عمداً: واجهة الـ Admin مبنيّة على
+ * NEXT_PUBLIC_API_URL=http://localhost:4000، وكوكي الـ refresh يُضبط
+ * SameSite=Strict. المتصفّح يعتبر `127.0.0.1` و`localhost` **موقعين مختلفين**،
+ * فلو قدّمنا الواجهة على 127.0.0.1 لأصبح طلب تسجيل الدخول cross-site ولأُسقط
+ * الكوكي بصمت ⇒ "انتهت الجلسة" فور الدخول. توحيد المضيف يبقي الطلب same-site.
+ */
 export const PROD_RENDERER_PORT = Number(process.env.DESKTOP_RENDERER_PORT ?? 3100);
-export const PROD_RENDERER_URL = `http://127.0.0.1:${PROD_RENDERER_PORT}`;
+export const PROD_RENDERER_HOST = "localhost";
+export const PROD_RENDERER_URL = `http://${PROD_RENDERER_HOST}:${PROD_RENDERER_PORT}`;
 
 /** أصول التنقّل المسموح بها داخل النافذة (حماية: منع أي navigation خارجها) */
 export function allowedNavigationOrigins(): string[] {

@@ -1,7 +1,14 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { EventEmitter } from "node:events";
-import { API_HEALTH_URL, IS_DEV, bundledApiCwd, bundledApiEntry } from "../config.js";
+import {
+  API_HEALTH_URL,
+  IS_DEV,
+  DEV_RENDERER_URL,
+  PROD_RENDERER_URL,
+  bundledApiCwd,
+  bundledApiEntry,
+} from "../config.js";
 import { scoped } from "../logger.js";
 import type { BackendStatus } from "../../shared/ipc.js";
 
@@ -78,11 +85,33 @@ export class BackendManager extends EventEmitter {
     return ok;
   }
 
+  /**
+   * أصول CORS المسموح بها للـ API المُجمَّج الذي نُشغّله نحن. عميله الوحيد هو
+   * واجهة هذا التطبيق (127.0.0.1:3100 في الإنتاج)، بينما افتراضي الـ API هو
+   * localhost:3000 — فبدون ضبطه يحجب المتصفّح استجابة تسجيل الدخول ويظهر
+   * "تعذر الاتصال بالخادم". نحترم أي ضبط صريح في بيئة التشغيل ونضيف إليه.
+   */
+  private corsOriginsForBundledApi(): string {
+    const configured = (process.env.CORS_ORIGINS ?? "")
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+    const required = [PROD_RENDERER_URL, DEV_RENDERER_URL];
+    return [...new Set([...configured, ...required])].join(",");
+  }
+
   private spawnChild(entry: string): void {
     log.info("spawning bundled API:", entry);
+    const corsOrigins = this.corsOriginsForBundledApi();
+    log.info("bundled API CORS_ORIGINS:", corsOrigins);
     this.child = spawn(process.execPath, [entry], {
       cwd: bundledApiCwd(),
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_ENV: "production" },
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        NODE_ENV: "production",
+        CORS_ORIGINS: corsOrigins,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     this.child.stdout?.on("data", (d: Buffer) => log.info("[api]", d.toString().trim()));

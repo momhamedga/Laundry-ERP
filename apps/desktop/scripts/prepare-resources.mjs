@@ -52,35 +52,63 @@ function pkgNameFromPnpmKey(key) {
  * على شجرة node_modules عبر realpath ونعيد المحزوم حقيقياً ومسطّحاً (بلا روابط).
  */
 function flattenClosure(projectNM, destNM) {
-  const seen = new Set();
-  const queue = []; // حاويات node_modules للمعالجة (BFS)
+  const placed = new Map(); // اسم الحزمة → المسار الحقيقي الموضوع في القمة
+  const nestedDone = new Set(); // "owner|name" لتفادي التكرار
+  const scanned = new Set(); // حاويات node_modules فُحصت
+  const queue = []; // { dir, owner } للمعالجة (BFS)
   let count = 0;
   let prismaDone = false;
 
-  const enqueue = (linkPath, name) => {
+  const copyPkg = (real, dest) => {
+    if (existsSync(dest)) return;
+    cpSync(real, dest, { recursive: true, dereference: true });
+    count++;
+  };
+
+  /**
+   * owner = الحزمة التي تُعدّ `name` تبعية لها (null للتبعيات المباشرة للمشروع).
+   *
+   * تعارض الإصدارات: pnpm يسمح بوجود نسخ متعدّدة من الحزمة نفسها، بينما القمة
+   * المسطّحة تتّسع لواحدة فقط. سابقاً كانت النسخة الثانية تُهمَل بصمت فينكسر من
+   * يحتاجها (مثال حقيقي: readable-stream@3 في القمة بينما jszip/unzipper يحتاجان
+   * v2 ذات `passthrough.js` ⇒ انهيار الـ API المُجمَّع عند الإقلاع). الآن تُوضع
+   * النسخة المخالفة داخل node_modules الخاصّة بصاحبها، وهو ما يحلّه Node أوّلاً.
+   */
+  const enqueue = (linkPath, name, owner) => {
     let real;
     try {
       real = realpathSync(linkPath);
     } catch {
       return;
     }
-    if (seen.has(real)) return;
-    seen.add(real);
-    const dest = path.join(destNM, ...name.split("/"));
-    if (!existsSync(dest)) {
+
+    const already = placed.get(name);
+    if (already === undefined) {
       // BFS يضمن أن تبعيات الـ API المباشرة تُنسخ أولاً فتفوز إصداراتها على مستوى
       // القمة (مثل zod@4 صاحب z.cuid) بدل نسخة انتقالية أقدم.
-      cpSync(real, dest, { recursive: true, dereference: true });
-      count++;
+      copyPkg(real, path.join(destNM, ...name.split("/")));
+      placed.set(name, real);
+    } else if (already !== real && owner) {
+      const key = `${owner}|${name}`;
+      if (!nestedDone.has(key)) {
+        nestedDone.add(key);
+        copyPkg(real, path.join(destNM, ...owner.split("/"), "node_modules", ...name.split("/")));
+      }
+    } else if (already !== real) {
+      return; // نسخة مخالفة بلا صاحب معروف - لا مكان آمن لوضعها
     }
+
     const marker = `${path.sep}node_modules${path.sep}`;
     const idx = real.lastIndexOf(marker);
-    if (idx !== -1) queue.push(real.slice(0, idx + marker.length - 1)); // حاوية الأشقّاء
-    const nested = path.join(real, "node_modules");
-    if (existsSync(nested)) queue.push(nested);
+    // حاوية الأشقّاء في مخزن pnpm تحوي تبعيات هذه الحزمة تحديداً ⇒ صاحبها هو name
+    if (idx !== -1) queue.push({ dir: real.slice(0, idx + marker.length - 1), owner: name });
+    const own = path.join(real, "node_modules");
+    if (existsSync(own)) queue.push({ dir: own, owner: name });
   };
 
-  const scan = (nmDir) => {
+  const scan = (nmDir, owner) => {
+    if (scanned.has(nmDir)) return;
+    scanned.add(nmDir);
     let entries;
     try {
       entries = readdirSync(nmDir);
@@ -108,15 +136,18 @@ function flattenClosure(projectNM, destNM) {
         } catch {
           continue;
         }
-        for (const pkg of inner) enqueue(path.join(full, pkg), `${entry}/${pkg}`);
+        for (const pkg of inner) enqueue(path.join(full, pkg), `${entry}/${pkg}`, owner);
         continue;
       }
-      enqueue(full, entry);
+      enqueue(full, entry, owner);
     }
   };
 
-  scan(projectNM); // (المستوى الأول) التبعيات المباشرة تفوز
-  while (queue.length) scan(queue.shift()); // ثم الانتقالية عرضاً
+  scan(projectNM, null); // (المستوى الأول) التبعيات المباشرة تفوز
+  while (queue.length) {
+    const { dir, owner } = queue.shift(); // ثم الانتقالية عرضاً
+    scan(dir, owner);
+  }
   return count;
 }
 
