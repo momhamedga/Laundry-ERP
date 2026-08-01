@@ -15,6 +15,7 @@ export {
   listPending,
   listAll,
   pendingCount,
+  recoverStaleSyncing,
   listFailed,
   retryOp,
   retryAllFailed,

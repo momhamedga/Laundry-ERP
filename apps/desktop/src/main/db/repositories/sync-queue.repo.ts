@@ -81,6 +81,57 @@ export function markSyncing(id: number): void {
     .run(id);
 }
 
+/** صفّ عالق في 'syncing' — بقيّة انهيار أثناء المزامنة. */
+export interface StaleSyncRow {
+  id: number;
+  entity: string;
+  op: string;
+  entity_id: string | null;
+  updated_at: string;
+}
+
+/**
+ * يستعيد العمليات العالقة في 'syncing' (v1.3.1).
+ *
+ * المشكلة: markSyncing يضع 'syncing' قبل الإرسال، وكل مخارج المعالجة تُغيّره
+ * (done/pending/failed). فإن مات المسار بينهما (انهيار، قطع كهرباء، إنهاء قسري)
+ * يبقى الصفّ 'syncing' إلى الأبد: takePending يلتقط 'pending' فقط، وlistFailed
+ * يعرض 'failed' فقط ⇒ العملية لا تُزامَن ولا تظهر للمستخدم.
+ *
+ * ⚠️ تُستدعى **عند الإقلاع فقط** (لا داخل initDatabase لأنه يُستدعى أيضاً بعد
+ * استرجاع نسخة احتياطية وقد تكون هناك مزامنة جارية في نفس العملية). في عملية
+ * جديدة — مع قفل النسخة الواحدة — لا يمكن أن تكون أي مزامنة قيد التنفيذ، فكل
+ * صفّ 'syncing' يقيناً بقيّة عملية ميتة؛ لذا نستعيدها جميعاً بلا عتبة زمنية.
+ *
+ * لا نزيد attempts: الانهيار ليس رفضاً من الخادم، وزيادته تدفع عملية سليمة نحو
+ * الحدّ الأقصى فتُحال إلى الطابور الميت ظلماً. next_attempt_at يبقى كما هو
+ * (كان مستحقّاً) فتُلتقط فوراً. العملية ذرّية داخل transaction، وآمنة للتكرار:
+ * التشغيل الثاني لا يجد صفوفاً فلا يفعل شيئاً.
+ */
+export function recoverStaleSyncing(): {
+  recovered: number;
+  rows: StaleSyncRow[];
+  pendingAfter: number;
+} {
+  const d = getDb();
+  return d.transaction(() => {
+    const rows = d
+      .prepare(
+        "SELECT id, entity, op, entity_id, updated_at FROM sync_queue WHERE status='syncing' ORDER BY id ASC",
+      )
+      .all() as StaleSyncRow[];
+    if (rows.length > 0) {
+      d.prepare(
+        "UPDATE sync_queue SET status='pending', updated_at=datetime('now') WHERE status='syncing'",
+      ).run();
+    }
+    const pendingAfter = (
+      d.prepare("SELECT count(*) c FROM sync_queue WHERE status='pending'").get() as { c: number }
+    ).c;
+    return { recovered: rows.length, rows, pendingAfter };
+  })();
+}
+
 export function markDone(id: number): void {
   getDb()
     .prepare("UPDATE sync_queue SET status='done', last_error=NULL, updated_at=datetime('now') WHERE id=?")

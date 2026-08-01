@@ -4,6 +4,41 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] — 2026-08-01 — Hotfix: stale sync recovery
+
+### Fixed
+- **Sync operations interrupted mid-flight were orphaned forever.** `markSyncing()`
+  sets a queue row to `syncing` immediately before the upload; every normal exit
+  moves it to `done`/`pending`/`failed`. If the process died in that window
+  (crash, power loss, force close, Task Manager kill) the row stayed `syncing`
+  permanently — `takePending()` only selects `pending` and `listFailed()` only
+  shows `failed`, so the operation never synced again **and never surfaced to the
+  user**. An offline order or payment could be silently stranded.
+
+  On startup (and only on startup — never from `initDatabase()`, which also runs
+  after a backup restore when a sync may legitimately be in flight) the app now
+  resets every `syncing` row back to `pending` inside a single transaction.
+  Because a fresh process holds the single-instance lock, no sync can be in
+  flight, so every such row is provably an orphan and no time threshold is needed.
+  `attempts` is deliberately not incremented — a crash is not a server rejection,
+  and inflating it would push a healthy operation toward the dead-letter queue.
+  The recovery is idempotent (a second run finds nothing) and logs each recovered
+  item plus a summary line.
+
+  Measured: recovered after crash **before** sync, **during** upload, and after an
+  external `taskkill /F`; recovered rows then synced successfully and the local
+  row was marked clean. Recovery cost 0.27 ms / 0.40 ms / 4.23 ms / 35.36 ms for
+  10 / 100 / 1,000 / 10,000 stale rows. Queue integrity after recovery: 0
+  duplicate ids, 0 impossible states, 0 orphan rows.
+
+### Known limitation (unchanged by this hotfix)
+- If the process dies **after** the server has applied a write but **before** the
+  response is recorded, the recovered operation is re-sent. For customers this is
+  absorbed by existing conflict resolution (the duplicate is linked to the
+  existing record). For orders and payments the API has no idempotency key, so a
+  duplicate could be created. Closing that window requires an API change and is
+  therefore out of scope for this hotfix.
+
 ## [Unreleased]
 
 ### Fixed — packaged desktop app was unusable (found by driving a real login)

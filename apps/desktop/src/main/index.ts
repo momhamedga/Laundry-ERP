@@ -17,6 +17,7 @@ import { backupOnExitIfEnabled, runBackup, startBackupSchedules, stopBackupSched
 import { registerShortcuts } from "./services/shortcuts.js";
 import { closeAllExtraWindows, openWindow, setRendererBase } from "./windows/windows-manager.js";
 import { closeDatabase, dbStatus, initDatabase } from "./db/database.js";
+import { recoverStaleSyncing } from "./db/repositories/index.js";
 import { syncEngine } from "./services/sync-engine.js";
 import { getSettings } from "./services/settings.js";
 import { registerIpc } from "./ipc/index.js";
@@ -108,6 +109,18 @@ async function onReady(): Promise<void> {
     initDatabase(); // Phase 11.6A: قاعدة SQLite المحلّية
     const s = dbStatus();
     log.info(`offline DB ready — ${s.tables} tables, sqlite ${s.sqliteVersion}, pending=${s.pendingSync}`);
+
+    // v1.3.1: استعادة عمليات المزامنة العالقة في 'syncing' بعد انهيار سابق.
+    // عند الإقلاع فقط — لا مزامنة قيد التنفيذ، فكل صفّ عالق بقيّة عملية ميتة.
+    const rec = recoverStaleSyncing();
+    for (const r of rec.rows) {
+      log.warn(
+        `recovered stale sync queue item #${r.id} (${r.entity}:${r.op}${r.entity_id ? ` ${r.entity_id}` : ""}) stuck since ${r.updated_at}`,
+      );
+    }
+    log.info(
+      `startup recovery completed — recovered=${rec.recovered}, pending queue size=${rec.pendingAfter}`,
+    );
   } catch (err) {
     log.error("offline DB init failed:", err);
   }
