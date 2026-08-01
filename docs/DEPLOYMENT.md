@@ -21,11 +21,31 @@ Required:
 | `JWT_REFRESH_SECRET` | signs refresh tokens (long random, different) |
 
 Common optional (see `apps/api/src/config/env.ts` for the authoritative list and
-defaults): `PORT` (default 4000), `NODE_ENV`, CORS origins, cookie/SSL flags, email
+defaults): `PORT` (default 4000), `NODE_ENV`, `CORS_ORIGINS`, cookie/SSL flags, email
 provider keys (Resend) for notifications. Set only what you use.
 
 > Keep `.env` out of version control (it is git-ignored) and out of the desktop
 > installer.
+
+### `CORS_ORIGINS` and the desktop app (important)
+
+`CORS_ORIGINS` defaults to `http://localhost:3000` (the web Admin in development).
+The desktop app serves its bundled Admin UI on **`http://localhost:3100`**, so:
+
+- **Bundled API** (the desktop starts the API itself): nothing to do — the desktop
+  passes the correct origins to the API process it spawns, merging any value you
+  set explicitly.
+- **Central / shared API** (the desktop points at a hosted API): you **must** add
+  the desktop's origin, e.g.
+  `CORS_ORIGINS=https://admin.example.com,http://localhost:3100`.
+  Without it the browser blocks the login response and users see
+  "تعذر الاتصال بالخادم" ("cannot connect to the server").
+
+> **Do not serve the desktop UI from `127.0.0.1`.** The Admin bundle calls the API
+> at `localhost`, and browsers treat `127.0.0.1` and `localhost` as different
+> sites — the `SameSite=Strict` refresh cookie would be dropped and every screen
+> would report "انتهت الجلسة" ("session expired") straight after login. The desktop
+> pins its renderer host to `localhost` for this reason.
 
 ## 3. API
 

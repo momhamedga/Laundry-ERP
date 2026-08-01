@@ -6,6 +6,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — packaged desktop app was unusable (found by driving a real login)
+- **Bundled API rejected the renderer (CORS).** The desktop spawned the API
+  without `CORS_ORIGINS`, so it defaulted to `localhost:3000` while the renderer
+  runs on `3100`; login failed with "cannot connect to the server". The desktop
+  now passes its renderer origins to the API it spawns, merging any explicit value.
+- **Refresh cookie was silently dropped (SameSite).** The renderer was served from
+  `127.0.0.1` while the Admin bundle calls the API at `localhost`; browsers treat
+  those as different sites, so the `SameSite=Strict` refresh cookie was never
+  stored and every screen showed "session expired" right after login. The renderer
+  is now served from `localhost`, keeping auth requests same-site.
+- **Bundled API crashed on startup (dependency version conflict).** Flattening
+  pnpm's tree can hold only one version per package, and a second version was
+  silently dropped: `readable-stream@3` won the top level while
+  `jszip`/`unzipper`/`archiver-utils`/`duplexer2`/`lazystream` need v2, so the API
+  died with `Cannot find module 'readable-stream/passthrough'` and restart-looped.
+  Conflicting versions are now nested under the package that requires them.
+
 ### Fixed
 - **Windows installer can now be built.** electron-builder aborted (rc=1) because
   extracting its winCodeSign tool failed on two macOS symlinks that Windows cannot
