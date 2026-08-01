@@ -4,6 +4,38 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-08-01 — Dependency security hardening
+
+### Security
+- Closed **all 5 high-severity advisories** in shipped dependencies by pinning
+  fixed versions through `pnpm` `overrides` in `pnpm-workspace.yaml`. The
+  vulnerable packages are transitive and could not be fixed by upgrading their
+  owners (`exceljs@4.4.0` is already the newest release; `postcss` and `sharp`
+  live inside Next's tree), so forcing resolutions was the lowest-risk route —
+  no application dependency was upgraded.
+  - `brace-expansion` → `^1.1.17` / `^2.1.3` / `^5.0.8` (DoS / OOM, patch bumps)
+  - `postcss` → `^8.5.25` (XSS, arbitrary file read, sourcemap path traversal)
+  - `sharp` → `^0.35.3` (inherited libvips CVE-2026-33327 / 33328)
+
+  Audit went from **9 advisories (6 high, 3 moderate) to 2 moderate**.
+
+### Deliberately not changed
+- **`uuid`** (moderate) is left at 8.3.2. The advisory covers a missing buffer
+  bounds check in `v3`/`v5`/`v6` **when `buf` is supplied**; `exceljs` imports
+  only `v4` (`const {v4: uuidv4} = require('uuid')`) and never passes `buf`, so
+  the flaw is unreachable here. Forcing a major bump 8 → 11 would risk breaking
+  report exports for no security gain.
+- **`@hono/node-server`** (moderate) reaches the tree only through the `shadcn`
+  CLI and is **not present in either shipped bundle** (verified against
+  `resources/api` and `resources/renderer`).
+
+### Verified after the change
+tsc 0 (api, admin, desktop) · eslint 0 · desktop build ok · **Admin production
+build ok** · **204 API unit tests in 27 files pass** · encrypted SQLite opens with
+integrity ok, FK enforced, rollback and cascade intact · sync/corruption
+resilience 12/12 · backup & restore suite 17/18 (the one miss is a known false
+assertion in the harness, not a defect) · native modules intact.
+
 ## [1.3.1] — 2026-08-01 — Hotfix: stale sync recovery
 
 ### Fixed

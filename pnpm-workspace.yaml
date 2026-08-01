@@ -1,6 +1,21 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# ==================== إصلاحات أمنية (v1.4.0) ====================
+# تُفرَض على شجرة التبعيات كاملة لإغلاق ثغرات معلَنة في حزم انتقالية لا يمكن
+# ترقيتها عبر مالكها (exceljs 4.4.0 هو الأحدث بالفعل، وpostcss/sharp داخل شجرة Next).
+#   brace-expansion : DoS/OOM   (GHSA) — ترقيات patch فقط
+#   postcss         : XSS + قراءة ملفات + اجتياز مسار عبر sourceMappingURL
+#   sharp           : ثغرات libvips الموروثة (CVE-2026-33327/33328)
+# مستثنى عمداً: uuid — الثغرة تخصّ v3/v5/v6 مع معامل buf، وexceljs تستدعي v4() فقط
+# (تحقُّق: `const {v4: uuidv4} = require('uuid')`)، فترقية major 8→11 خطر بلا فائدة.
+overrides:
+  "brace-expansion@1": "^1.1.17"
+  "brace-expansion@2": "^2.1.3"
+  "brace-expansion@5": "^5.0.8"
+  postcss: "^8.5.25"
+  sharp: "^0.35.3"
 allowBuilds:
   better-sqlite3: true
   '@prisma/client': true
