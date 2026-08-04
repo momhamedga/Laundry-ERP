@@ -1,10 +1,11 @@
 # Laundry ERP — Enterprise Edition
 
 A production-grade ERP for laundry / dry-cleaning businesses: a web admin dashboard
-backed by an enterprise API, plus a Windows desktop application that works **fully
-offline** and **auto-syncs** when connectivity returns.
+backed by an enterprise API, plus a Windows desktop application with a local
+encrypted store, an offline sync queue, and **fully offline licensing and
+activation** (no server, no internet at any point).
 
-**Current release:** v1.3.0 · **Repository:** https://github.com/momhamedga/Laundry-ERP
+**Current release:** v2.0.0 · **Repository:** https://github.com/momhamedga/Laundry-ERP
 
 ---
 
