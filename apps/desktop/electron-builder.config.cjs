@@ -21,7 +21,10 @@ const val = (v, fallback) => (!v || isPlaceholder(v) ? fallback : v);
 const productName = branding.product.name;
 const company = val(branding.company?.name, productName);
 const year = new Date().getFullYear();
-const copyright = `${val(branding.legal?.copyright, `Copyright © ${year}`)} ${company}`.trim();
+// نُلحق اسم الشركة فقط إن لم يكن مذكوراً أصلاً — وإلا تكرّر
+// ("Copyright © 2026 MidoCode. All Rights Reserved. MidoCode").
+const copyrightBase = val(branding.legal?.copyright, `Copyright © ${year}`);
+const copyright = copyrightBase.includes(company) ? copyrightBase : `${copyrightBase} ${company}`.trim();
 
 /** اسم الأصل بلا مسافات: ‎${productName} يحوي مسافة فيكسر مطابقة latest.yml ويسبب 404. */
 const slug = productName.replace(/\s+/g, "-");

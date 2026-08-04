@@ -60,7 +60,9 @@ export function showAboutDialog(): void {
   const machineId = getFingerprint().machineId;
 
   const detail: string[] = [];
-  if (real(b.product?.tagline)) detail.push(b.product.tagline!);
+  // الحوار عربي بالكامل — نفضّل الشعار العربي إن وُجد
+  const tagline = real(b.product?.taglineAr) ?? real(b.product?.tagline);
+  if (tagline) detail.push(tagline);
   detail.push("");
   detail.push(`الإصدار      : ${app.getVersion()}${real(b.product?.edition) ? ` ${b.product.edition}` : ""}`);
   detail.push(`الالتزام     : ${info.commit}${info.dirty ? " (غير ملتزم)" : ""}`);

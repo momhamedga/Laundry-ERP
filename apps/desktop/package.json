@@ -2,9 +2,9 @@
   "name": "@laundry/desktop",
   "version": "2.0.0",
   "private": true,
-  "description": "نظام متكامل لإدارة المغاسل — يعمل دون إنترنت",
+  "description": "Professional Laundry Management System",
   "main": "dist/main/index.js",
-  "author": "Laundry ERP",
+  "author": "MidoCode",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build:main": "tsc -p tsconfig.json",

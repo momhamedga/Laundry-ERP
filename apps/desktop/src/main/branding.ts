@@ -14,7 +14,7 @@ import path from "node:path";
  */
 
 export interface Branding {
-  product: { name: string; nameAr?: string; tagline?: string; version?: string; edition?: string };
+  product: { name: string; nameAr?: string; tagline?: string; taglineAr?: string; version?: string; edition?: string };
   company: { name?: string; nameEn?: string; website?: string; address?: string };
   support: { email?: string; phone?: string; whatsapp?: string; hours?: string; responseTime?: string };
   legal: { copyright?: string; warranty?: string; licenseTerms?: string };

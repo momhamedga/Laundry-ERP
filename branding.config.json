@@ -10,36 +10,77 @@
     "nameAr": "نظام إدارة المغاسل",
     "version": "2.0.0",
     "edition": "Stable",
-    "tagline": "نظام متكامل لإدارة المغاسل — يعمل دون إنترنت",
+    "tagline": "Professional Laundry Management System",
+    "taglineAr": "نظام احترافي متكامل لإدارة المغاسل",
     "appId": "com.laundryerp.desktop",
     "githubOwner": "momhamedga",
     "githubRepo": "Laundry-ERP"
   },
   "company": {
-    "name": "<<اسم الشركة أو الاسم التجاري>>",
-    "nameEn": "<<Company Legal Name>>",
-    "website": "<<https://example.com>>",
-    "address": "<<العنوان الكامل>>",
-    "taxNumber": "<<الرقم الضريبي — اتركه فارغاً إن لم يوجد>>",
-    "commercialRegister": "<<رقم السجل التجاري — اتركه فارغاً إن لم يوجد>>"
+    "name": "MidoCode",
+    "nameEn": "MidoCode Software Solutions",
+    "owner": "Mohamed Gamal",
+    "website": "https://mojimmy-portfolio.vercel.app",
+    "email": "midoga400@gmail.com",
+    "phone": "+971 589915968",
+    "address": "Egypt",
+    "taxNumber": "",
+    "commercialRegister": ""
   },
   "support": {
-    "email": "<<support@example.com>>",
-    "phone": "<<+20 1X XXXX XXXX>>",
-    "whatsapp": "<<+20 1X XXXX XXXX>>",
-    "hours": "<<الأحد–الخميس، 9 صباحاً – 5 مساءً>>",
-    "responseTime": "<<خلال يوم عمل واحد>>",
-    "remoteTool": "<<AnyDesk / TeamViewer — أو اتركه فارغاً>>"
+    "email": "midoga400@gmail.com",
+    "phone": "+971 589915968",
+    "whatsapp": "+971 589915968",
+    "website": "https://mojimmy-portfolio.vercel.app",
+    "hours": "Sunday - Thursday | 09:00 AM - 06:00 PM (GMT+2)",
+    "responseTime": "Within one business day",
+    "remoteTool": "AnyDesk",
+    "languages": [
+      "Arabic",
+      "English"
+    ]
   },
   "invoice": {
-    "currency": "<<EGP>>",
-    "paymentMethods": "<<تحويل بنكي / فودافون كاش / نقداً>>",
-    "bankDetails": "<<اسم البنك — رقم الحساب — IBAN>>",
-    "notes": "<<شروط الدفع، مثال: تُدفع القيمة كاملة قبل تسليم الترخيص>>"
+    "currency": "EGP",
+    "paymentMethods": [
+      "Bank Transfer",
+      "Vodafone Cash",
+      "Cash"
+    ],
+    "bankDetails": "",
+    "notes": "The software license is activated after full payment. The customer receives a personalized activation license tied to the device."
   },
   "legal": {
-    "copyright": "Copyright © 2026",
-    "licenseTerms": "<<رابط أو ملخّص شروط الترخيص>>",
-    "warranty": "<<مدة الضمان/الصيانة المشمولة، مثال: 12 شهراً دعم فني>>"
+    "copyright": "Copyright © 2026 MidoCode. All Rights Reserved.",
+    "licenseTerms": "Each license is issued for one customer and is linked to the customer's device. Redistribution, reverse engineering, or resale without written permission from MidoCode is prohibited.",
+    "privacy": "Customer data remains the property of the customer. MidoCode does not access customer data unless remote support is explicitly requested.",
+    "warranty": "12 months of technical support and maintenance from the activation date.",
+    "eulaVersion": "2.0"
+  },
+  "branding": {
+    "publisher": "MidoCode",
+    "developer": "Mohamed Gamal",
+    "copyrightOwner": "MidoCode",
+    "companySlogan": "Building Smart Business Software.",
+    "companyDescription": "MidoCode develops professional desktop applications, enterprise management systems, AI-powered software solutions, and modern business platforms.",
+    "primaryColor": "#2563EB",
+    "secondaryColor": "#0F172A"
+  },
+  "release": {
+    "channel": "Stable",
+    "autoUpdate": true,
+    "minimumSupportedVersion": "2.0.0",
+    "licenseRequired": true,
+    "offlineActivation": true,
+    "supportedPlatforms": [
+      "Windows 10",
+      "Windows 11"
+    ]
+  },
+  "links": {
+    "portfolio": "https://mojimmy-portfolio.vercel.app",
+    "github": "https://github.com/momhamedga/Laundry-ERP",
+    "documentation": "https://mojimmy-portfolio.vercel.app",
+    "support": "mailto:midoga400@gmail.com"
   }
 }

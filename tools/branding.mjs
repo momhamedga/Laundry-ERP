@@ -46,10 +46,31 @@ export function assertNoPlaceholders(branding = loadBranding()) {
   );
 }
 
-/** يستبدل {{company.name}} وأمثالها داخل نصّ. */
+/**
+ * يستبدل {{company.name}} وأمثالها داخل نصّ.
+ *
+ * السطر الذي قيمته الوحيدة فارغة يُحذف كاملاً بدل طباعة عنوان بلا قيمة
+ * ("الرقم الضريبي    :") — الحقول الاختيارية التي لا يملؤها المورّد كانت تظهر
+ * للعميل كأسطر خاوية في ملفّ الفاتورة.
+ */
 export function render(template, branding = loadBranding()) {
-  return template.replace(/\{\{([\w.]+)\}\}/g, (whole, key) => {
-    const val = key.split(".").reduce((o, k) => (o == null ? undefined : o[k]), branding);
-    return val === undefined ? whole : String(val);
-  });
+  const value = (key) => key.split(".").reduce((o, k) => (o == null ? undefined : o[k]), branding);
+
+  return template
+    .split("\n")
+    .filter((line) => {
+      const keys = [...line.matchAll(/\{\{([\w.]+)\}\}/g)].map((m) => m[1]);
+      if (keys.length === 0) return true;
+      // يُحذف السطر إن كانت كل عناصره النائبة فارغة (ولم يحمل نصّاً آخر ذا معنى)
+      const allEmpty = keys.every((k) => {
+        const v = value(k);
+        return v === undefined || v === null || String(v).trim() === "";
+      });
+      return !allEmpty;
+    })
+    .join("\n")
+    .replace(/\{\{([\w.]+)\}\}/g, (whole, key) => {
+      const v = value(key);
+      return v === undefined ? whole : String(v);
+    });
 }
