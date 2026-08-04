@@ -73,3 +73,8 @@ desktop.ini
 
 # ==================== Misc ====================
 .cache/
+
+# Phase 15C — مخرجات بناء التسليم
+docs/pdf/
+dist-client/
+apps/desktop/build/branding.config.json

@@ -1,8 +1,8 @@
 {
   "name": "@laundry/desktop",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Laundry ERP — Enterprise laundry management",
+  "description": "نظام متكامل لإدارة المغاسل — يعمل دون إنترنت",
   "main": "dist/main/index.js",
   "author": "Laundry ERP",
   "scripts": {
@@ -15,11 +15,12 @@
     "start": "pnpm run build && electron .",
     "dev": "cross-env DESKTOP_ENV=development pnpm run build && cross-env DESKTOP_ENV=development electron .",
     "prepare:wincodesign": "node scripts/prepare-wincodesign.mjs",
-    "package": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --publish never",
-    "dist": "node scripts/prepare-resources.mjs && pnpm run build && pnpm run prepare:wincodesign && electron-builder --win --publish never",
-    "package:win": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --win --publish never",
-    "package:linux": "pnpm run build && electron-builder --linux --publish never",
-    "package:dir": "pnpm run build && pnpm run prepare:wincodesign && electron-builder --dir --publish never"
+    "package": "pnpm run prepare:branding && pnpm run build && pnpm run prepare:wincodesign && electron-builder --config electron-builder.config.cjs --publish never",
+    "dist": "node scripts/prepare-resources.mjs && pnpm run prepare:branding && pnpm run build && pnpm run prepare:wincodesign && electron-builder --config electron-builder.config.cjs --win --publish never",
+    "package:win": "pnpm run prepare:branding && pnpm run build && pnpm run prepare:wincodesign && electron-builder --config electron-builder.config.cjs --win --publish never",
+    "package:linux": "pnpm run build && electron-builder --config electron-builder.config.cjs --linux --publish never",
+    "package:dir": "pnpm run prepare:branding && pnpm run build && pnpm run prepare:wincodesign && electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "prepare:branding": "node scripts/prepare-branding.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
@@ -28,7 +29,8 @@
     "electron-log": "^5.2.0",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.3.9",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "@laundry/license-sdk": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -42,5 +44,6 @@
     "eslint": "^9.18.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.20.0"
-  }
+  },
+  "productName": "Laundry ERP"
 }

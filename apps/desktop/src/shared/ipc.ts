@@ -71,6 +71,12 @@ export const INVOKE_CHANNELS = {
   OFFLINE_QUEUE_DISCARD: "offline:queue:discard",
   OFFLINE_QUEUE_STATS: "offline:queue:stats",
 
+  // Phase 15B — نظام التراخيص دون إنترنت
+  LICENSE_STATUS: "license:status",
+  LICENSE_MACHINE_ID: "license:machine-id",
+  LICENSE_EXPORT_REQUEST: "license:export-request",
+  LICENSE_IMPORT: "license:import",
+
   // Phase 11.6D — Barcode / Camera / Scanner
   BARCODE_GENERATE: "barcode:generate",
   BARCODE_VALIDATE: "barcode:validate",
@@ -133,7 +139,15 @@ export interface AppInfo {
   locale: string;
 }
 
-export type BackendStatus = "starting" | "ready" | "reusing-external" | "crashed" | "restarting" | "stopped";
+/** "unconfigured" (Phase 15C): إعداد التشغيل ناقص — لم يُشغَّل الـ API أصلاً */
+export type BackendStatus =
+  | "starting"
+  | "ready"
+  | "reusing-external"
+  | "crashed"
+  | "restarting"
+  | "stopped"
+  | "unconfigured";
 export type NetStatus = "online" | "offline";
 export type UpdateStatus =
   | { state: "checking" }
@@ -470,3 +484,5 @@ export interface CameraCapture {
   sizeBytes: number;
   createdAt: string;
 }
+/** حالة الترخيص كما تصل للواجهة (Phase 15B) — النوع الأصلي في @laundry/license-sdk */
+export type { LicenseStatus, LicensePayload, LicenseType, LicenseFeature } from "@laundry/license-sdk";

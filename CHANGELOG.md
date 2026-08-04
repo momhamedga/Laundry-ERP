@@ -4,6 +4,42 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] — 2026-08-04 — Commercial release
+
+First commercially shippable build. No changes to business workflows, database
+schema, or API routes — this release is about product packaging and licensing.
+
+### Added
+- **Offline license & product activation** (Phase 15B). RSA-4096/SHA-256 signed
+  `.lkey` files, 5-component machine fingerprint with 3-of-5 tolerance, a 14-day
+  grace period, clock-rollback detection, and a **License** page for activation.
+  No server, no API, no internet at any point.
+- **License enforcement.** When a license lapses past its grace period, creating
+  new financial records (customers, orders, payments, invoices, purchases,
+  suppliers) is blocked through a single reusable checkpoint enforced in three
+  layers. Reading, reporting, exporting, printing, backup, and restore stay
+  available and **no data is ever hidden or deleted**.
+- **License Manager** (`tools/license-manager`) — a developer-only local GUI to
+  issue, renew, revoke, search, verify, and track licences, with a local
+  registry and automatic registry backups. Never shipped to customers.
+- **Client package builder** (`tools/build-client-package.mjs`) producing the
+  ready-to-send folder: installer, licence, guides, support and invoice details.
+- **Arabic PDF documentation** generated locally via Chromium: user manual,
+  activation guide, support guide, release notes.
+- Central `branding.config.json` for all product, support, and invoice details,
+  with a hard gate that refuses to build a customer package while placeholder
+  values remain.
+
+### Fixed
+- **«عن التطبيق» (About) wrote a line to the log and showed the user nothing.**
+  It is now a full dialog with version, licence status, supplier and support
+  details, and a **Copy support details** button.
+- Splash screen now shows the version number.
+
+### Notes
+- Upgrading from 1.x preserves all data and settings. The app will ask to be
+  activated; the 14-day grace period means work is never interrupted meanwhile.
+
 ## [1.4.0] — 2026-08-01 — Dependency security hardening
 
 ### Security

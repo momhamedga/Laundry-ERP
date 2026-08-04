@@ -10,6 +10,7 @@ import {
   bundledApiEntry,
 } from "../config.js";
 import { scoped } from "../logger.js";
+import { missingRequired, readServerEnv } from "../runtime/index.js";
 import type { BackendStatus } from "../../shared/ipc.js";
 
 const log = scoped("backend");
@@ -67,6 +68,16 @@ export class BackendManager extends EventEmitter {
       return true;
     }
 
+    // Phase 15C: لا نُشغّل الـ API بإعداد ناقص. خطأ الإعداد دائم لا عابر، فكل
+    // محاولة ستفشل بنفس السبب وتستهلك حدّ إعادة المحاولة بلا فائدة، وينتهي
+    // العميل بتطبيق ميت بلا تفسير. نتوقّف فوراً بحالة واضحة بدل ذلك.
+    const missing = missingRequired();
+    if (missing.length > 0) {
+      log.error(`إعداد التشغيل ناقص (${missing.join(", ")}) — لن يُشغَّل الـ API`);
+      this.setStatus("unconfigured");
+      return false;
+    }
+
     const entry = bundledApiEntry();
     if (!fs.existsSync(entry)) {
       // تطوير بلا خادم مُجمّع: ننتظر خادم dev الخارجي (يشغّله المطوّر)
@@ -108,6 +119,10 @@ export class BackendManager extends EventEmitter {
       cwd: bundledApiCwd(),
       env: {
         ...process.env,
+        // Phase 15C: إعداد التشغيل من %APPDATA%/@laundry/runtime — هو ما يجعل
+        // النسخة المُثبَّتة تعمل بلا أي ملفّ .env داخل مجلّد البرنامج.
+        // يُطبَّق بعد process.env كي تكون له الأولوية على أي بيئة موروثة.
+        ...readServerEnv(),
         ELECTRON_RUN_AS_NODE: "1",
         NODE_ENV: "production",
         CORS_ORIGINS: corsOrigins,

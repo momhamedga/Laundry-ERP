@@ -23,6 +23,13 @@ import { listCaptures, saveCapture } from "../services/camera.js";
 import { recordEvent } from "../db/repositories/events.repo.js";
 import { dbStatus } from "../db/database.js";
 import {
+  buildActivationRequest,
+  getFingerprint,
+  getLicenseStatus,
+  importLicense,
+} from "../license/license-service.js";
+import { assertSellingAllowed } from "../license/license-guard.js";
+import {
   createCustomer,
   updateCustomer,
   listCustomers,
@@ -268,9 +275,11 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
     return v;
   };
 
-  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_CREATE, (_e, p) =>
-    createCustomer(assertObject(p) as unknown as NewCustomer),
-  );
+  // الإنشاء وحده محروس بالترخيص؛ التحديث والقراءة يبقيان متاحين دائماً
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_CREATE, (_e, p) => {
+    assertSellingAllowed("customer:create");
+    return createCustomer(assertObject(p) as unknown as NewCustomer);
+  });
   handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_UPDATE, (_e, p) => {
     const o = assertObject(p);
     return updateCustomer(asString(o, "id"), (o.patch ?? {}) as CustomerPatch);
@@ -282,17 +291,19 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
     getCustomer(asString(assertObject(p), "id")),
   );
 
-  handle(INVOKE_CHANNELS.OFFLINE_ORDER_CREATE, (_e, p) =>
-    createOrder(assertObject(p) as unknown as NewOrder),
-  );
+  handle(INVOKE_CHANNELS.OFFLINE_ORDER_CREATE, (_e, p) => {
+    assertSellingAllowed("order:create");
+    return createOrder(assertObject(p) as unknown as NewOrder);
+  });
   handle(INVOKE_CHANNELS.OFFLINE_ORDER_LIST, (_e, p) => listOrders((p ?? {}) as ListQuery));
   handle(INVOKE_CHANNELS.OFFLINE_ORDER_GET, (_e, p) =>
     getOrder(asString(assertObject(p), "id")),
   );
 
-  handle(INVOKE_CHANNELS.OFFLINE_PAYMENT_CREATE, (_e, p) =>
-    createPayment(assertObject(p) as unknown as NewPayment),
-  );
+  handle(INVOKE_CHANNELS.OFFLINE_PAYMENT_CREATE, (_e, p) => {
+    assertSellingAllowed("payment:create");
+    return createPayment(assertObject(p) as unknown as NewPayment);
+  });
   handle(INVOKE_CHANNELS.OFFLINE_PAYMENT_LIST, (_e, p) =>
     listPayments(asString(assertObject(p), "order_id")),
   );
@@ -341,6 +352,37 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   handle(INVOKE_CHANNELS.UPDATE_CHECK, () => checkForUpdates());
   handle(INVOKE_CHANNELS.UPDATE_DOWNLOAD, () => downloadUpdate());
   handle(INVOKE_CHANNELS.UPDATE_INSTALL, () => installUpdate());
+
+  // ==================== License (Phase 15B) ====================
+  // للقراءة فقط + استيراد ملفّ. لا يوجد أي مسار لإصدار ترخيص من داخل التطبيق.
+  handle(INVOKE_CHANNELS.LICENSE_STATUS, () => getLicenseStatus());
+  handle(INVOKE_CHANNELS.LICENSE_MACHINE_ID, () => getFingerprint().machineId);
+  handle(INVOKE_CHANNELS.LICENSE_EXPORT_REQUEST, async () => {
+    const req = buildActivationRequest();
+    const win = getMainWindow();
+    const defaultPath = `activation-request-${req.machineId}.json`;
+    const res = win
+      ? await dialog.showSaveDialog(win, { title: "تصدير طلب التفعيل", defaultPath, filters: [{ name: "JSON", extensions: ["json"] }] })
+      : await dialog.showSaveDialog({ defaultPath, filters: [{ name: "JSON", extensions: ["json"] }] });
+    if (res.canceled || !res.filePath) return null;
+    await fs.writeFile(res.filePath, JSON.stringify(req, null, 2), "utf8");
+    return res.filePath;
+  });
+  handle(INVOKE_CHANNELS.LICENSE_IMPORT, async (_e, p) => {
+    // يقبل إمّا محتوى الترخيص مباشرة أو يفتح حوار اختيار ملفّ
+    const o = (p ?? {}) as { content?: string };
+    if (typeof o.content === "string" && o.content.length > 0) return importLicense(o.content);
+    const win = getMainWindow();
+    // ‎.lkey هو الامتداد التجاري (v2.0)؛ نقبل القديمة كي لا يتعطّل عميل سبق تسليمه
+    const opts = {
+      title: "اختر ملفّ الترخيص",
+      filters: [{ name: "Laundry ERP License", extensions: ["lkey", "license", "dat", "txt"] }],
+      properties: ["openFile" as const],
+    };
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    if (res.canceled || res.filePaths.length === 0) return null;
+    return importLicense(await fs.readFile(res.filePaths[0]!, "utf8"));
+  });
 
   // ==================== Barcode / Camera / Scanner (Phase 11.6D) ====================
   const SYMBOLOGIES: BarcodeSymbology[] = ["code128", "code39", "ean13", "ean8", "upca", "qrcode"];

@@ -15,7 +15,7 @@ const DATA_FILES = ["desktop-settings.json", "desktop-config.json"];
 const SQLITE_FILE = "laundry-offline.db";
 const MAGIC = "LAUNDRY_DESKTOP_BACKUP_V1";
 
-function backupDir(): string {
+export function backupDir(): string {
   const dir = path.join(app.getPath("userData"), "backups");
   fs.mkdirSync(dir, { recursive: true });
   return dir;

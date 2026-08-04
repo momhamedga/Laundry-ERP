@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Laundry ERP — مدير التراخيص</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141a2e; --panel2:#1b2237; --line:#273052;
+    --fg:#e7ecf5; --muted:#8b95ad; --accent:#4f46e5; --accent2:#3b82f6;
+    --ok:#10b981; --warn:#f59e0b; --err:#ef4444;
+  }
+  @media (prefers-color-scheme: light){
+    :root{--bg:#f6f7fb;--panel:#fff;--panel2:#f0f2f8;--line:#e2e6f0;--fg:#111726;--muted:#5d6478}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Tahoma,system-ui,sans-serif;background:var(--bg);color:var(--fg);font-size:14px}
+  header{padding:16px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
+    background:var(--panel);position:sticky;top:0;z-index:10}
+  .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:17px}
+  h1{font-size:16px;margin:0;font-weight:700}
+  .sub{font-size:12px;color:var(--muted)}
+  .warnbar{background:#7c2d12;color:#fed7aa;padding:8px 24px;font-size:12.5px;border-bottom:1px solid var(--line)}
+  main{padding:20px 24px;max-width:1280px;margin:0 auto}
+  .tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+  .tab{padding:9px 16px;cursor:pointer;border:none;background:none;color:var(--muted);font:inherit;
+    border-bottom:2px solid transparent;border-radius:6px 6px 0 0}
+  .tab:hover{color:var(--fg);background:var(--panel2)}
+  .tab.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 14px;font-weight:700}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  input,select,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--fg);font:inherit}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  textarea{min-height:76px;font-family:ui-monospace,Consolas,monospace;font-size:12px;resize:vertical}
+  button{padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--fg);font:inherit;cursor:pointer}
+  button:hover{background:var(--line)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{filter:brightness(1.12)}
+  button.danger{background:transparent;border-color:var(--err);color:var(--err)}
+  button.danger:hover{background:var(--err);color:#fff}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--panel)}
+  tbody tr:hover{background:var(--panel2)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
+  .pill.active{background:rgba(16,185,129,.16);color:var(--ok)}
+  .pill.expiring{background:rgba(245,158,11,.16);color:var(--warn)}
+  .pill.expired{background:rgba(239,68,68,.16);color:var(--err)}
+  .pill.revoked{background:rgba(239,68,68,.28);color:var(--err)}
+  .pill.renewed{background:rgba(139,149,173,.2);color:var(--muted)}
+  .msg{padding:11px 14px;border-radius:9px;margin-bottom:14px;font-size:13px;white-space:pre-wrap}
+  .msg.ok{background:rgba(16,185,129,.12);color:var(--ok);border:1px solid rgba(16,185,129,.3)}
+  .msg.err{background:rgba(239,68,68,.12);color:var(--err);border:1px solid rgba(239,68,68,.3)}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  .muted{color:var(--muted)}
+  .stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:16px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px}
+  .stat b{display:block;font-size:22px;margin-bottom:2px}
+  .stat span{font-size:12px;color:var(--muted)}
+  dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--fg);
+    padding:20px;max-width:520px;width:92%}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  .hide{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔑</div>
+  <div>
+    <h1>مدير التراخيص — Laundry ERP</h1>
+    <div class="sub">أداة داخلية · تعمل محلّياً على 127.0.0.1 · لا تُشحن للعميل</div>
+  </div>
+</header>
+
+<div class="warnbar" id="keywarn" hidden>
+  ⚠ زوج المفاتيح غير موجود — شغّل <span class="mono">node tools/license-generator/dist/cli.js keygen</span> أولاً.
+</div>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="list">السجلّ</button>
+    <button class="tab" data-tab="issue">إصدار ترخيص</button>
+    <button class="tab" data-tab="verify">فحص ملفّ</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <!-- ==================== السجلّ ==================== -->
+  <section id="tab-list">
+    <div class="card">
+      <div class="row" style="margin-bottom:14px">
+        <input id="q" placeholder="ابحث باسم العميل، الشركة، معرّف الجهاز، أو رقم الترخيص…" style="flex:1;min-width:240px" />
+        <select id="filter" style="width:auto">
+          <option value="">كل الحالات</option>
+          <option value="active">سارٍ</option>
+          <option value="expiring">قارب الانتهاء</option>
+          <option value="expired">منتهٍ</option>
+          <option value="revoked">ملغى</option>
+          <option value="renewed">مُجدَّد (قديم)</option>
+        </select>
+        <button onclick="load()">تحديث</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>العميل</th><th>النوع</th><th>الجهاز</th><th>الانتهاء</th>
+            <th>الحالة</th><th>السعر</th><th>إجراءات</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="muted" id="empty" style="text-align:center;padding:26px" hidden>لا توجد تراخيص بعد.</p>
+    </div>
+  </section>
+
+  <!-- ==================== إصدار ==================== -->
+  <section id="tab-issue" class="hide">
+    <div class="card">
+      <h2>1 — طلب التفعيل من العميل</h2>
+      <p class="muted" style="margin-top:-6px">
+        الصق محتوى ملفّ <span class="mono">activation-request-*.json</span> الذي أرسله العميل،
+        أو اسحب الملفّ إلى المربّع.
+      </p>
+      <textarea id="req" dir="ltr" style="text-align:left" placeholder='{ "machineId": "LAU-XXXX-XXXX-XXXX", "fullHash": "…", "components": { … } }'></textarea>
+      <div class="row" style="margin-top:9px">
+        <input type="file" id="reqfile" accept=".json" style="width:auto" />
+        <span class="muted mono" id="reqinfo"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2 — بيانات الترخيص</h2>
+      <div class="grid">
+        <div><label>اسم العميل *</label><input id="customer" placeholder="مغسلة النور" /></div>
+        <div><label>اسم الشركة</label><input id="company" placeholder="Al-Noor Laundry" /></div>
+        <div>
+          <label>النوع</label>
+          <select id="type">
+            <option value="trial">تجريبي (14 يوماً)</option>
+            <option value="starter">أساسي</option>
+            <option value="professional" selected>احترافي</option>
+            <option value="enterprise">مؤسسي</option>
+          </select>
+        </div>
+        <div><label>المدّة (أيام) — فارغ = دائم</label><input id="days" type="number" min="1" placeholder="365" /></div>
+        <div><label>المستخدمون (فارغ = افتراضي النوع)</label><input id="users" type="number" placeholder="—" /></div>
+        <div><label>الأجهزة</label><input id="devices" type="number" placeholder="—" /></div>
+        <div><label>الفروع (-1 = غير محدود)</label><input id="branches" type="number" placeholder="—" /></div>
+        <div><label>أدنى إصدار تطبيق</label><input id="minver" dir="ltr" style="text-align:left" placeholder="1.0" /></div>
+        <div><label>السعر / رقم الفاتورة</label><input id="price" dir="auto" placeholder="12000 EGP — INV-2026-014" /></div>
+        <div style="grid-column:1/-1"><label>ملاحظات داخلية</label><input id="notes" placeholder="لا تظهر للعميل" /></div>
+      </div>
+      <p class="muted" id="presetinfo" style="font-size:12px"></p>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" onclick="issue()">إصدار الترخيص</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== فحص ==================== -->
+  <section id="tab-verify" class="hide">
+    <div class="card">
+      <h2>فحص ملفّ ترخيص</h2>
+      <p class="muted" style="margin-top:-6px">
+        يتحقّق بنفس منطق التطبيق تماماً. مفيد عند شكوى عميل: يخبرك إن كان الملفّ سليماً
+        وموقّعاً بمفتاحك، ولأي جهاز صدر، ومتى ينتهي.
+      </p>
+      <textarea id="vcontent" dir="ltr" style="min-height:130px;text-align:left" placeholder="-----BEGIN LAUNDRY ERP LICENSE-----&#10;…&#10;-----END LAUNDRY ERP LICENSE-----"></textarea>
+      <div class="row" style="margin-top:9px">
+        <input type="file" id="vfile" accept=".lkey,.license,.dat,.txt" style="width:auto" />
+        <button class="primary" onclick="verify()">فحص</button>
+      </div>
+      <pre id="vout" class="mono" style="margin-top:14px;white-space:pre-wrap"></pre>
+    </div>
+  </section>
+</main>
+
+<!-- حوار التجديد -->
+<dialog id="renewDlg">
+  <h2 style="margin-top:0;font-size:15px">تجديد ترخيص</h2>
+  <p class="muted" id="renewWho" style="font-size:13px"></p>
+  <div class="grid">
+    <div><label>المدّة الجديدة (أيام) — فارغ = دائم</label><input id="renewDays" type="number" placeholder="365" /></div>
+    <div><label>السعر / رقم الفاتورة</label><input id="renewPrice" dir="auto" placeholder="—" /></div>
+  </div>
+  <p class="muted" style="font-size:12px">
+    يُصدَر ترخيص جديد لنفس الجهاز، ويُعلَّم القديم «مُجدَّد». أرسل الملفّ الجديد للعميل ليستورده.
+  </p>
+  <div class="row" style="justify-content:flex-end;margin-top:14px">
+    <button onclick="renewDlg.close()">إلغاء</button>
+    <button class="primary" onclick="doRenew()">تجديد وإصدار</button>
+  </div>
+</dialog>
+
+<!-- حوار الإلغاء -->
+<dialog id="revokeDlg">
+  <h2 style="margin-top:0;font-size:15px">إلغاء ترخيص</h2>
+  <p class="muted" id="revokeWho" style="font-size:13px"></p>
+  <div class="msg err" style="margin-bottom:12px">
+    الإلغاء يُسجَّل <b>في سجلّك أنت فقط</b>. لا توجد قناة تصل لجهاز عميل مُفعَّل في نظام
+    يعمل دون إنترنت، فالترخيص المُسلَّم يبقى صالحاً على جهازه حتى تاريخ انتهائه.
+    فائدة الإلغاء: يمنع تجديده ويظهر بوضوح في السجلّ.
+  </div>
+  <div><label>سبب الإلغاء</label><input id="revokeReason" placeholder="عدم سداد / إلغاء تعاقد / إصدار بالخطأ" /></div>
+  <div class="row" style="justify-content:flex-end;margin-top:14px">
+    <button onclick="revokeDlg.close()">تراجع</button>
+    <button class="danger" onclick="doRevoke()">تأكيد الإلغاء</button>
+  </div>
+</dialog>
+
+<script>
+let STATE = { licenses: [], presets: {}, unlimited: -1 };
+let renewId = null, revokeId = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function say(kind, text) {
+  $("msg").innerHTML = `<div class="msg ${kind}">${esc(text)}</div>`;
+  if (kind === "ok") setTimeout(() => ($("msg").innerHTML = ""), 9000);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const d = await r.json();
+  if (!r.ok || d.ok === false) throw new Error(d.error || "فشل الطلب");
+  return d;
+}
+
+// ==================== التبويبات ====================
+document.querySelectorAll(".tab").forEach((t) => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("on"));
+    t.classList.add("on");
+    for (const s of ["list", "issue", "verify"]) {
+      $("tab-" + s).classList.toggle("hide", s !== t.dataset.tab);
+    }
+  };
+});
+
+// ==================== التحميل والعرض ====================
+async function load() {
+  const d = await api("/api/state");
+  STATE = d;
+  $("keywarn").hidden = d.keysReady;
+  render();
+  showPreset();
+}
+
+function fmtNum(n) { return n === STATE.unlimited ? "∞" : n; }
+function fmtDate(d) { return d ? String(d).slice(0, 10) : "دائم"; }
+
+const LABEL = { active:"سارٍ", expiring:"قارب الانتهاء", expired:"منتهٍ", revoked:"ملغى", renewed:"مُجدَّد" };
+const TYPE = { trial:"تجريبي", starter:"أساسي", professional:"احترافي", enterprise:"مؤسسي" };
+
+function filtered() {
+  const q = $("q").value.trim().toLowerCase();
+  const f = $("filter").value;
+  return STATE.licenses.filter((l) => {
+    if (f && l.effective !== f) return false;
+    if (!q) return true;
+    return [l.customerName, l.companyName, l.machineId, l.licenseId, l.price, l.notes]
+      .some((v) => String(v ?? "").toLowerCase().includes(q));
+  });
+}
+
+function render() {
+  const all = STATE.licenses;
+  const count = (k) => all.filter((l) => l.effective === k).length;
+  $("stats").innerHTML = [
+    ["الإجمالي", all.length], ["سارٍ", count("active")], ["قارب الانتهاء", count("expiring")],
+    ["منتهٍ", count("expired")], ["ملغى", count("revoked")],
+  ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+
+  const rows = filtered();
+  $("empty").hidden = rows.length > 0;
+  $("rows").innerHTML = rows.map((l) => `
+    <tr>
+      <td><b>${esc(l.customerName)}</b><br><span class="muted" style="font-size:11.5px">${esc(l.companyName)}</span></td>
+      <td>${TYPE[l.type] ?? esc(l.type)}<br><span class="muted mono" style="font-size:11px">${fmtNum(l.maxUsers)}م · ${fmtNum(l.maxBranches)}ف</span></td>
+      <td class="mono" style="font-size:11.5px">${esc(l.machineId)}</td>
+      <td>${fmtDate(l.expiryDate)}${l.daysRemaining !== null && l.effective !== "revoked" && l.effective !== "renewed" ? `<br><span class="muted" style="font-size:11.5px">${l.daysRemaining > 0 ? l.daysRemaining + " يوم" : "انتهى"}</span>` : ""}</td>
+      <td><span class="pill ${l.effective}">${LABEL[l.effective] ?? l.effective}</span>${l.revokeReason ? `<br><span class="muted" style="font-size:11px">${esc(l.revokeReason)}</span>` : ""}</td>
+      <!-- bdi يمنع خلط الاتجاه: "12000 EGP — INV-2026-014" كان يُعرض معكوساً -->
+      <td class="muted" style="font-size:12px"><bdi>${esc(l.price || "—")}</bdi></td>
+      <td>
+        <div class="row" style="gap:5px">
+          <button onclick="dl('${esc(l.fileName)}')" title="تنزيل ملفّ الترخيص">تنزيل</button>
+          ${l.status === "active" ? `<button onclick="openRenew('${l.licenseId}')">تجديد</button>
+          <button class="danger" onclick="openRevoke('${l.licenseId}')">إلغاء</button>` : ""}
+        </div>
+      </td>
+    </tr>`).join("");
+}
+
+$("q").oninput = render;
+$("filter").onchange = render;
+
+function dl(file) { window.location = "/api/download?file=" + encodeURIComponent(file); }
+
+// ==================== الإصدار ====================
+function showPreset() {
+  const p = STATE.presets?.[$("type").value];
+  if (!p) return;
+  $("presetinfo").textContent =
+    `الافتراضي لهذا النوع: مستخدمون ${fmtNum(p.maxUsers)} · أجهزة ${fmtNum(p.maxDevices)} · ` +
+    `فروع ${fmtNum(p.maxBranches)} · مزايا: ${p.features.join("، ")}` +
+    (p.trialDays ? ` · المدّة ${p.trialDays} يوماً` : "");
+}
+$("type").onchange = showPreset;
+
+$("reqfile").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $("req").value = await f.text();
+  $("reqinfo").textContent = f.name;
+};
+
+async function issue() {
+  try {
+    let request;
+    try { request = JSON.parse($("req").value); }
+    catch { return say("err", "طلب التفعيل ليس JSON صالحاً. الصق محتوى الملفّ كاملاً."); }
+
+    const d = await api("/api/issue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        request,
+        customerName: $("customer").value.trim(),
+        companyName: $("company").value.trim(),
+        type: $("type").value,
+        days: $("days").value,
+        users: $("users").value,
+        devices: $("devices").value,
+        branches: $("branches").value,
+        minAppVersion: $("minver").value.trim(),
+        notes: $("notes").value.trim(),
+        price: $("price").value.trim(),
+      }),
+    });
+    say("ok", `✓ صدر الترخيص وتحقّقنا من توقيعه\nالعميل: ${d.payload.customerName}\nالجهاز: ${d.payload.machine.machineId}\nالانتهاء: ${fmtDate(d.payload.expiryDate)}\nالملفّ: ${d.fileName}`);
+    for (const id of ["req","customer","company","days","users","devices","branches","notes","price"]) $(id).value = "";
+    $("reqinfo").textContent = "";
+    await load();
+    dl(d.fileName);
+  } catch (e) { say("err", e.message); }
+}
+
+// ==================== التجديد والإلغاء ====================
+function openRenew(id) {
+  renewId = id;
+  const l = STATE.licenses.find((x) => x.licenseId === id);
+  $("renewWho").textContent = `${l.customerName} — ${l.machineId} — ينتهي ${fmtDate(l.expiryDate)}`;
+  $("renewDays").value = "365";
+  $("renewPrice").value = "";
+  renewDlg.showModal();
+}
+async function doRenew() {
+  try {
+    const d = await api("/api/renew", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ licenseId: renewId, days: $("renewDays").value, price: $("renewPrice").value.trim() }),
+    });
+    renewDlg.close();
+    say("ok", `✓ تم التجديد — ترخيص جديد حتى ${fmtDate(d.payload.expiryDate)}\nأرسل الملفّ للعميل: ${d.fileName}`);
+    await load();
+    dl(d.fileName);
+  } catch (e) { renewDlg.close(); say("err", e.message); }
+}
+
+function openRevoke(id) {
+  revokeId = id;
+  const l = STATE.licenses.find((x) => x.licenseId === id);
+  $("revokeWho").textContent = `${l.customerName} — ${l.machineId}`;
+  $("revokeReason").value = "";
+  revokeDlg.showModal();
+}
+async function doRevoke() {
+  try {
+    await api("/api/revoke", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ licenseId: revokeId, reason: $("revokeReason").value.trim() }),
+    });
+    revokeDlg.close();
+    say("ok", "تم تسجيل الإلغاء في السجلّ المحلّي.");
+    await load();
+  } catch (e) { revokeDlg.close(); say("err", e.message); }
+}
+
+// ==================== الفحص ====================
+$("vfile").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (f) $("vcontent").value = await f.text();
+};
+async function verify() {
+  try {
+    const d = await api("/api/verify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: $("vcontent").value }),
+    });
+    const p = d.payload;
+    $("vout").textContent = [
+      `النتيجة    : ${d.valid ? "✓ سليم وموقَّع بمفتاحك" : "✗ مرفوض — " + (d.reason ?? "")}`,
+      d.message ? `التفصيل    : ${d.message}` : "",
+      p ? `العميل     : ${p.customerName} (${p.companyName})` : "",
+      p ? `النوع      : ${TYPE[p.type] ?? p.type}` : "",
+      p ? `الجهاز     : ${p.machine.machineId}` : "",
+      p ? `الإصدار    : ${fmtDate(p.issueDate)}` : "",
+      p ? `الانتهاء   : ${fmtDate(p.expiryDate)}${d.daysRemaining != null ? ` (${d.daysRemaining} يوم)` : ""}` : "",
+      p ? `الحدود     : مستخدمون ${fmtNum(p.maxUsers)} · أجهزة ${fmtNum(p.maxDevices)} · فروع ${fmtNum(p.maxBranches)}` : "",
+      p ? `رقم الترخيص: ${p.licenseId}` : "",
+    ].filter(Boolean).join("\n");
+  } catch (e) { $("vout").textContent = "خطأ: " + e.message; }
+}
+
+load().catch((e) => say("err", e.message));
+</script>
+</body>
+</html>

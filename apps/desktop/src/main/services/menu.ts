@@ -1,7 +1,7 @@
 import { Menu, app, shell, type MenuItemConstructorOptions } from "electron";
-import log from "electron-log/main";
 import { getMainWindow, navigateRenderer } from "../windows/main-window.js";
 import { IS_DEV } from "../config.js";
+import { showAboutDialog } from "./about.js";
 
 /**
  * قائمة أصلية عربية. عناصر التنقّل تبثّ حدث NAVIGATE للـ SPA (لا تغيّر الـ routing).
@@ -68,9 +68,10 @@ export function buildAppMenu(): void {
           label: "فتح مجلد السجلّات",
           click: () => void shell.openPath(app.getPath("logs")),
         },
+        { type: "separator" as const },
         {
           label: "عن التطبيق",
-          click: () => log.info(`Laundry ERP Desktop v${app.getVersion()}`),
+          click: () => showAboutDialog(),
         },
       ],
     },

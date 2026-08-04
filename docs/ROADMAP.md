@@ -4,6 +4,7 @@
 
 | Version | Theme | Highlights |
 |---|---|---|
+| **v2.0.0** | Commercial release | Offline license system + enforcement, runtime configuration & first-run bootstrap, client package builder, Arabic PDF documentation, About window |
 | **v1.3.0** | Security & Reliability Hardening | SQLite encryption at rest (DPAPI-sealed key), CSP, auto-update (electron-updater + GitHub), richer crash analytics, **fix:** backups include the offline DB |
 | **v1.2.0** | Enterprise Offline Edition | Local SQLite, offline repositories, background sync engine, conflict resolution, backoff + dead-letter, offline barcode/label, USB scanner, camera capture |
 | **v1.0.0** | Initial desktop release | Electron shell over Admin + API, printing, cash drawer, multi-window, tray, notifications, crash reporter, backup, shortcuts, settings |

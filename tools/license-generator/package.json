@@ -1,0 +1,17 @@
+{
+  "name": "@laundry/license-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DEVELOPER-ONLY offline license generator. Never ship to customers.",
+  "main": "dist/cli.js",
+  "bin": { "laundry-license": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "keygen": "node dist/cli.js keygen",
+    "issue": "node dist/cli.js issue",
+    "inspect": "node dist/cli.js inspect"
+  },
+  "dependencies": { "@laundry/license-sdk": "workspace:*" },
+  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^5.8.3" }
+}

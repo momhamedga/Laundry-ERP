@@ -13,7 +13,11 @@
     "db:studio": "pnpm --filter @laundry/api db:studio",
     "admin:dev": "pnpm --filter @laundry/admin dev",
     "admin:build": "pnpm --filter @laundry/admin build",
-    "admin:start": "pnpm --filter @laundry/admin start"
+    "admin:start": "pnpm --filter @laundry/admin start",
+    "branding:check": "node -e \"import(\"./tools/branding.mjs\").then(m=>{try{m.assertNoPlaceholders();console.log(\"بيانات الهوية مكتملة\")}catch(e){console.error(e.message);process.exit(1)}})\"",
+    "license:manager": "node tools/license-manager/server.mjs",
+    "docs:pdf": "apps/desktop/node_modules/.bin/electron tools/build-docs-pdf.cjs",
+    "package:client": "node tools/build-client-package.mjs"
   },
   "engines": {
     "node": ">=20"

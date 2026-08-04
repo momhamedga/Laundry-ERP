@@ -1,0 +1,45 @@
+{
+  "_README": [
+    "مصدر الحقيقة الوحيد لهوية المنتج وبيانات الدعم والفاتورة (Phase 15C).",
+    "املأ كل قيمة تبدأ بـ << >> ثم شغّل: pnpm run branding:check",
+    "تُقرأ منه: حوار «عن التطبيق»، شاشة البداية، حزمة العميل، وكل الوثائق.",
+    "لا تُشحن أي قيمة مؤقتة للعميل — سكربت الحزمة يرفض البناء إن بقيت."
+  ],
+  "product": {
+    "name": "Laundry ERP",
+    "nameAr": "نظام إدارة المغاسل",
+    "version": "2.0.0",
+    "edition": "Stable",
+    "tagline": "نظام متكامل لإدارة المغاسل — يعمل دون إنترنت",
+    "appId": "com.laundryerp.desktop",
+    "githubOwner": "momhamedga",
+    "githubRepo": "Laundry-ERP"
+  },
+  "company": {
+    "name": "<<اسم الشركة أو الاسم التجاري>>",
+    "nameEn": "<<Company Legal Name>>",
+    "website": "<<https://example.com>>",
+    "address": "<<العنوان الكامل>>",
+    "taxNumber": "<<الرقم الضريبي — اتركه فارغاً إن لم يوجد>>",
+    "commercialRegister": "<<رقم السجل التجاري — اتركه فارغاً إن لم يوجد>>"
+  },
+  "support": {
+    "email": "<<support@example.com>>",
+    "phone": "<<+20 1X XXXX XXXX>>",
+    "whatsapp": "<<+20 1X XXXX XXXX>>",
+    "hours": "<<الأحد–الخميس، 9 صباحاً – 5 مساءً>>",
+    "responseTime": "<<خلال يوم عمل واحد>>",
+    "remoteTool": "<<AnyDesk / TeamViewer — أو اتركه فارغاً>>"
+  },
+  "invoice": {
+    "currency": "<<EGP>>",
+    "paymentMethods": "<<تحويل بنكي / فودافون كاش / نقداً>>",
+    "bankDetails": "<<اسم البنك — رقم الحساب — IBAN>>",
+    "notes": "<<شروط الدفع، مثال: تُدفع القيمة كاملة قبل تسليم الترخيص>>"
+  },
+  "legal": {
+    "copyright": "Copyright © 2026",
+    "licenseTerms": "<<رابط أو ملخّص شروط الترخيص>>",
+    "warranty": "<<مدة الضمان/الصيانة المشمولة، مثال: 12 شهراً دعم فني>>"
+  }
+}

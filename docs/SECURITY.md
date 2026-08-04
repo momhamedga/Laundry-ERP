@@ -1,7 +1,16 @@
 # Security
 
 This document describes the security posture as implemented and **measured** in
-v1.3.0. Items that were not verifiable in the build environment are marked.
+v2.0.0. Items that were not verifiable in the build environment are marked.
+
+Since v2.0.0 the following were added and measured — see the linked documents:
+
+- **Offline licensing** (RSA-4096/SHA-256, machine binding, tamper detection) — [LICENSE_SYSTEM.md](LICENSE_SYSTEM.md)
+- **Runtime configuration** (secrets generated locally, never shipped, stored
+  outside the backup scope) — [RUNTIME.md](RUNTIME.md)
+- **Electron hardening verified at runtime**: contextIsolation, sandbox,
+  nodeIntegration=false, DevTools disabled in production, window.open blocked,
+  no Node surface reachable from the renderer.
 
 ## Authentication & authorization (API)
 

@@ -15,6 +15,7 @@ import {
   type CameraCapture,
   type CustomerPatch,
   type GenerateBarcodeOptions,
+  type LicenseStatus,
   type ListQuery,
   type LocalCustomer,
   type LocalOrder,
@@ -102,6 +103,17 @@ const api = {
   },
   shortcuts: {
     list: () => invoke<ShortcutDef[]>(INVOKE_CHANNELS.SHORTCUTS_LIST),
+  },
+  license: {
+    /** حالة الترخيص الحالية (قراءة فقط) */
+    status: () => invoke<LicenseStatus>(INVOKE_CHANNELS.LICENSE_STATUS),
+    /** معرّف الجهاز المعروض LAU-XXXX-XXXX-XXXX */
+    machineId: () => invoke<string>(INVOKE_CHANNELS.LICENSE_MACHINE_ID),
+    /** يحفظ طلب التفعيل كملفّ JSON ليرسله العميل للمطوّر */
+    exportRequest: () => invoke<string | null>(INVOKE_CHANNELS.LICENSE_EXPORT_REQUEST),
+    /** يستورد ملفّ ترخيص (بمحتوى مباشر أو عبر حوار اختيار ملفّ) */
+    import: (content?: string) =>
+      invoke<LicenseStatus | null>(INVOKE_CHANNELS.LICENSE_IMPORT, { content }),
   },
   barcode: {
     generate: (opts: GenerateBarcodeOptions) =>

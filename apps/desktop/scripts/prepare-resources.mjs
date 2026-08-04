@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,6 +51,95 @@ function pkgNameFromPnpmKey(key) {
  * جذر مساحة العمل (مثل الـ API) - لا يوجد .pnpm محلي، بل روابط إلى الجذر. نمشي
  * على شجرة node_modules عبر realpath ونعيد المحزوم حقيقياً ومسطّحاً (بلا روابط).
  */
+/**
+ * جذور تبعيات الإنتاج المُعلَنة في package.json المجاور لمجلّد node_modules.
+ * تُعيد null إن تعذّرت القراءة (فيعود المُسطِّح لسلوكه القديم).
+ */
+function productionRoots(projectNM) {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(path.dirname(projectNM), "package.json"), "utf8"));
+    const names = Object.keys(pkg.dependencies ?? {});
+    return names.length > 0 ? names : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ملفّات لا لزوم لها وقت التشغيل: خرائط المصدر، الاختبارات، الوثائق، ملفّات Git.
+ * حذفها لا يمسّ التنفيذ — Node لا يقرأ ‎.map إلا عند فتح المنقّح.
+ */
+// ⚠ محافظة عمداً. المحاولة الأولى شملت "doc"/"docs"/"test"/"example" فحذفت
+// exceljs/lib/doc — وهو شيفرة تشغيل حقيقية — فانهار الـ API بـ
+// "Cannot find module './doc/workbook'". أسماء المجلّدات ليست دليلاً على
+// المحتوى؛ لا نحذف إلا ما لا يمكن أن يكون شيفرة تشغيل.
+const PRUNE_DIRS = new Set(["__tests__", "__mocks__", "__fixtures__", ".github", ".git", "coverage", ".nyc_output"]);
+const PRUNE_FILE_RE = /(\.map|\.md|\.markdown|\.ts\.map)$/i;
+const PRUNE_EXACT = /^(\.npmignore|\.editorconfig|\.eslintrc.*|\.prettierrc.*|\.travis\.yml|\.gitattributes|\.gitignore|AUTHORS|CONTRIBUTORS|\.DS_Store)$/i;
+const PRUNE_TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+
+/** يمشي على الشجرة ويحذف ما سبق. يعيد عدد البايتات المحرَّرة. */
+function pruneTree(root) {
+  let freed = 0;
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (PRUNE_DIRS.has(e.name.toLowerCase())) {
+          try {
+            freed += dirSize(full);
+            rmSync(full, { recursive: true, force: true });
+          } catch {
+            /* تجاهل */
+          }
+          continue;
+        }
+        walk(full);
+      } else if (PRUNE_FILE_RE.test(e.name) || PRUNE_EXACT.test(e.name)) {
+        try {
+          freed += statSync(full).size;
+          rmSync(full, { force: true });
+        } catch {
+          /* تجاهل */
+        }
+      }
+    }
+  };
+  walk(root);
+  return freed;
+}
+
+function dirSize(dir) {
+  let total = 0;
+  const walk = (d) => {
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk(full);
+      else {
+        try {
+          total += statSync(full).size;
+        } catch {
+          /* تجاهل */
+        }
+      }
+    }
+  };
+  walk(dir);
+  return total;
+}
+
 function flattenClosure(projectNM, destNM) {
   const placed = new Map(); // اسم الحزمة → المسار الحقيقي الموضوع في القمة
   const nestedDone = new Set(); // "owner|name" لتفادي التكرار
@@ -143,7 +232,28 @@ function flattenClosure(projectNM, destNM) {
     }
   };
 
-  scan(projectNM, null); // (المستوى الأول) التبعيات المباشرة تفوز
+  // Phase 15.5: المستوى الأول يقتصر على تبعيات الإنتاج المُعلَنة.
+  // كان المسح يشمل كل ما في node_modules — بما فيه devDependencies (prisma CLI
+  // 71MB، typescript 23MB، vitest 10MB، أدوات البناء) — فتُشحن للعميل بلا فائدة.
+  // الإغلاق الانتقالي يبدأ من جذور الإنتاج فقط، فيبقى كل ما يحتاجه التشغيل.
+  const prodRoots = productionRoots(projectNM);
+  if (prodRoots) {
+    for (const name of prodRoots) {
+      enqueue(path.join(projectNM, ...name.split("/")), name, null);
+    }
+    // عميل Prisma المُولَّد (.prisma) ليس تبعية مُعلَنة لكنه لازم وقت التشغيل
+    const dotPrisma = path.join(projectNM, ".prisma");
+    if (existsSync(dotPrisma) && !prismaDone) {
+      try {
+        cpSync(realpathSync(dotPrisma), path.join(destNM, ".prisma"), { recursive: true, dereference: true });
+        prismaDone = true;
+      } catch {
+        /* تجاهل */
+      }
+    }
+  } else {
+    scan(projectNM, null); // بلا package.json مقروء: السلوك القديم (آمن)
+  }
   while (queue.length) {
     const { dir, owner } = queue.shift(); // ثم الانتقالية عرضاً
     scan(dir, owner);
@@ -196,6 +306,8 @@ if (existsSync(apiPrisma)) cpSync(apiPrisma, path.join(resources, "api", "prisma
 if (existsSync(apiNodeModules)) {
   const nApi = flattenPnpm(apiNodeModules, path.join(resources, "api", "node_modules"));
   console.log(`• node_modules مسطّح للـ API: ${nApi} حزمة (بلا روابط رمزية)`);
+  const freedApi = pruneTree(path.join(resources, "api", "node_modules"));
+  console.log(`• تشذيب الـ API: تحرّر ${(freedApi / 1048576).toFixed(1)} MB (خرائط/اختبارات/وثائق)`);
 }
 
 // ==================== Renderer (Next standalone) ====================
@@ -208,6 +320,8 @@ cpSync(standalone, rendererDest, {
 // (2) node_modules مسطّح من .pnpm الخاص بالـ standalone
 const nRen = flattenPnpm(path.join(standalone, "node_modules"), path.join(rendererDest, "node_modules"));
 console.log(`• node_modules مسطّح للواجهة: ${nRen} حزمة (بلا روابط رمزية)`);
+const freedRen = pruneTree(path.join(rendererDest, "node_modules"));
+console.log(`• تشذيب الواجهة: تحرّر ${(freedRen / 1048576).toFixed(1)} MB`);
 // (3) standalone لا يتضمّن .next/static ولا public — يجب نسخهما بجواره
 if (existsSync(nextStatic))
   cpSync(nextStatic, path.join(rendererDest, "apps", "admin", ".next", "static"), { recursive: true });

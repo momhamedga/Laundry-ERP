@@ -18,6 +18,11 @@ import { registerShortcuts } from "./services/shortcuts.js";
 import { closeAllExtraWindows, openWindow, setRendererBase } from "./windows/windows-manager.js";
 import { closeDatabase, dbStatus, initDatabase } from "./db/database.js";
 import { recoverStaleSyncing } from "./db/repositories/index.js";
+import { evaluateLicense, logLicenseState } from "./license/license-service.js";
+import { bootstrapRuntime } from "./runtime/index.js";
+import { showUnconfiguredDialog } from "./runtime/unconfigured-dialog.js";
+import { handleOpenedFile } from "./services/file-open.js";
+import { installNetworkGuard, warnOnStartup } from "./license/license-guard.js";
 import { syncEngine } from "./services/sync-engine.js";
 import { getSettings } from "./services/settings.js";
 import { registerIpc } from "./ipc/index.js";
@@ -53,12 +58,20 @@ function bootstrap(): void {
     app.setAsDefaultProtocolClient(APP_PROTOCOL);
   }
 
-  app.on("second-instance", () => {
+  app.on("second-instance", (_e, argv) => {
     const win = getMainWindow();
     if (win) {
       if (win.isMinimized()) win.restore();
       win.focus();
     }
+    // Phase 15.5: النقر المزدوج على ‎.lkey ونسخة تعمل ⇒ يصل المسار في argv
+    void handleOpenedFile(argv);
+  });
+
+  // macOS: فتح ملفّ مرتبط
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault();
+    void handleOpenedFile([filePath]);
   });
 
   // deep link (macOS)
@@ -104,6 +117,12 @@ function bootstrap(): void {
 async function onReady(): Promise<void> {
   initLogging();
   initCrashReporter();
+
+  // Phase 15C: تهيئة إعداد التشغيل قبل أي شيء يعتمد عليه (الـ API خاصّة).
+  // idempotent: تُنشئ ما ينقص فقط ولا تمسّ سرّاً موجوداً، فالتحديث وإعادة
+  // التثبيت لا يُبطلان جلسات المستخدمين.
+  const runtime = bootstrapRuntime();
+
   applyStartupSettings();
   try {
     initDatabase(); // Phase 11.6A: قاعدة SQLite المحلّية
@@ -121,10 +140,15 @@ async function onReady(): Promise<void> {
     log.info(
       `startup recovery completed — recovered=${rec.recovered}, pending queue size=${rec.pendingAfter}`,
     );
+
+    // Phase 15B: تقييم الترخيص بعد جاهزية القاعدة (حالة السماح تُخزَّن فيها)
+    logLicenseState(evaluateLicense());
   } catch (err) {
     log.error("offline DB init failed:", err);
   }
   applySessionSecurity(session.defaultSession);
+  // Phase 15B: الحاجز الأخير لعمليات الإنشاء — يعمل حتى لو عُدّلت شيفرة الواجهة
+  installNetworkGuard(session.defaultSession);
   buildAppMenu();
 
   const splash = createSplashWindow();
@@ -132,6 +156,13 @@ async function onReady(): Promise<void> {
   // 1) شغّل (أو أعد استخدام) الـ API المحلي
   const apiOk = await backend.start();
   if (!apiOk) {
+    if (!runtime.ready) {
+      // إعداد ناقص: لا فائدة من إعادة المحاولة — نخبر المستخدم بما ينقص وكيف
+      // يُصلحه بدل تركه أمام تطبيق ميت بلا تفسير (كان هذا سلوك v2.0.0).
+      splash.destroy();
+      await showUnconfiguredDialog(runtime.missing);
+      return;
+    }
     log.error("backend not healthy — the UI will still load and show a connection error");
   }
 
@@ -152,6 +183,11 @@ async function onReady(): Promise<void> {
   const win = createMainWindow(rendererUrl);
   win.once("ready-to-show", () => {
     if (!splash.isDestroyed()) splash.destroy();
+    // Phase 15B: تنبيه اقتراب الانتهاء/انتهاء السماح — بعد ظهور النافذة كي
+    // يكون الحوار مرتبطاً بها لا معلّقاً فوق شاشة البداية
+    warnOnStartup();
+    // Phase 15.5: ملفّ ‎.lkey فُتح بالنقر المزدوج وشغّل نسخة جديدة
+    void handleOpenedFile(process.argv);
   });
 
   // 4) خدمات سطح المكتب Enterprise

@@ -1,22 +1,23 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, app } from "electron";
 import { appIconPath } from "../config.js";
 
 /**
  * شاشة بداية خفيفة (frameless) تُعرض فوراً أثناء إقلاع الـ API والـ renderer،
  * فيبدو الإقلاع سريعاً. HTML مضمّن (data URL) - لا ملفّات خارجية ولا شبكة.
  */
-const SPLASH_HTML = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/>
+const splashHtml = (version: string): string => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/>
 <style>
   :root{color-scheme:light dark}
   html,body{margin:0;height:100%;font-family:'Cairo',system-ui,sans-serif;
     background:#0b1020;color:#e7ecf5;overflow:hidden}
-  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+  .wrap{position:relative;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
   .logo{width:64px;height:64px;border-radius:16px;
     background:linear-gradient(135deg,#4f46e5,#3b82f6);
     display:flex;align-items:center;justify-content:center;font-size:30px;
     box-shadow:0 10px 40px rgba(79,70,229,.45)}
   .title{font-size:18px;font-weight:700;letter-spacing:.3px}
   .sub{font-size:13px;color:#8b95ad}
+  .ver{position:absolute;bottom:12px;font-size:11px;color:#5d6478}
   .bar{width:180px;height:4px;border-radius:9999px;background:#1c2338;overflow:hidden}
   .bar>i{display:block;height:100%;width:40%;border-radius:9999px;
     background:linear-gradient(90deg,#4f46e5,#3b82f6);animation:load 1.1s infinite ease-in-out}
@@ -26,6 +27,7 @@ const SPLASH_HTML = `<!doctype html><html lang="ar" dir="rtl"><head><meta charse
   <div class="title">نظام إدارة المغاسل</div>
   <div class="sub" id="msg">جارٍ تشغيل النظام…</div>
   <div class="bar"><i></i></div>
+  <div class="ver">Laundry ERP v${version}</div>
 </div></body></html>`;
 
 export function createSplashWindow(): BrowserWindow {
@@ -43,7 +45,7 @@ export function createSplashWindow(): BrowserWindow {
     icon: appIconPath(),
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
-  void splash.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(SPLASH_HTML)}`);
+  void splash.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml(app.getVersion()))}`);
   splash.once("ready-to-show", () => splash.show());
   return splash;
 }

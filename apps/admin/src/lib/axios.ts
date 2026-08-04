@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@/constants/config";
+import { assertSellingAllowed, isBlockedCreate, LicenseBlockedError } from "@/lib/license-gate";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -27,10 +28,15 @@ export const authHttp = axios.create({
 
 // ==================== Request Interceptor ====================
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Phase 15B: نقطة التحقق الموحّدة للترخيص — تمنع إنشاء البيانات المالية قبل
+  // إرسال الطلب. القراءة والتقارير والنسخ الاحتياطي لا تمرّ من هذا الشرط.
+  if (isBlockedCreate(config.method, config.url)) {
+    await assertSellingAllowed();
   }
   return config;
 });
@@ -94,6 +100,8 @@ interface ApiErrorBody {
 
 /** استخراج رسالة خطأ قابلة للعرض من أي فشل */
 export function getErrorMessage(error: unknown): string {
+  // منع الترخيص له رسالته الخاصة — لا يُعرض كخطأ عام غامض
+  if (error instanceof LicenseBlockedError) return error.message;
   if (error instanceof AxiosError) {
     const body = error.response?.data as ApiErrorBody | undefined;
     if (body?.message) return body.message;

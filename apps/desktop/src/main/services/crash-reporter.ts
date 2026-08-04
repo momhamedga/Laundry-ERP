@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { scoped } from "../logger.js";
+import { companyName, productName } from "../branding.js";
 import type { CrashReport } from "../../shared/ipc.js";
 
 const log = scoped("crash");
@@ -40,8 +41,9 @@ function minidumpDir(): string {
 /** يفعّل مُبلِّغ الأعطال محليّاً فقط (لا رفع لأي خدمة خارجية). */
 export function initCrashReporter(): void {
   crashReporter.start({
-    productName: "Laundry ERP",
-    companyName: "Laundry ERP",
+    // Phase 15.5: من branding.config.json لا نصّ مُصلَّب
+    productName: productName(),
+    companyName: companyName(),
     submitURL: "", // لا رفع
     uploadToServer: false,
     compress: true,
