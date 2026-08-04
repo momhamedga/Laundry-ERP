@@ -18,7 +18,7 @@ import crypto from "node:crypto";
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { pathToFileURL } from "node:url";
-import { loadBranding, ROOT } from "../branding.mjs";
+import { loadBranding, render, ROOT } from "../branding.mjs";
 
 const RELEASE_DIR = path.join(ROOT, "apps", "desktop", "release");
 const DOCS = path.join(ROOT, "docs");
@@ -280,7 +280,79 @@ function build(cfg) {
     else if (fs.existsSync(md)) copy(md, path.join("3-الأدلّة", `${ar}.md`));
   }
 
-  // ---------- 4. اقرأني ----------
+  // ---------- 4. الدعم والفاتورة ----------
+  // دليل الدعم الفني يحيل العميل صراحةً إلى «بيانات الدعم الفني.txt»؛ غيابه
+  // يترك مرجعاً مكسوراً في وثيقة تُسلَّم للعميل.
+  put(
+    path.join("4-الدعم", "بيانات الدعم الفني.txt"),
+    render(
+      [
+        "════════════════════════════════════════",
+        "   الدعم الفني — {{product.name}} v{{product.version}}",
+        "════════════════════════════════════════",
+        "",
+        "المورّد        : {{company.name}}",
+        "الموقع         : {{company.website}}",
+        "العنوان        : {{company.address}}",
+        "",
+        "البريد         : {{support.email}}",
+        "الهاتف         : {{support.phone}}",
+        "واتساب         : {{support.whatsapp}}",
+        "أوقات العمل    : {{support.hours}}",
+        "زمن الاستجابة  : {{support.responseTime}}",
+        "الدعم عن بُعد  : {{support.remoteTool}}",
+        "",
+        "════════════════════════════════════════",
+        "قبل التواصل، جهّز:",
+        "  • من «مساعدة ← عن التطبيق ← نسخ بيانات الدعم»",
+        "    (ينسخ الإصدار والترخيص ومعرّف الجهاز دفعة واحدة).",
+        "  • وصف المشكلة وخطوات تكرارها، ولقطة شاشة إن أمكن.",
+        "  • ملفّ السجلّات: «عن التطبيق ← فتح السجلّات».",
+        "",
+        `العميل         : ${cfg.customerName}`,
+        `المغسلة        : ${cfg.laundryName}`,
+        `معرّف الجهاز   : ${machineId}`,
+        `رقم الترخيص    : ${payload.licenseId}`,
+        "",
+        "{{legal.copyright}}",
+      ].join("\n"),
+      branding,
+    ),
+  );
+
+  put(
+    path.join("4-الدعم", "بيانات الفاتورة والسداد.txt"),
+    render(
+      [
+        "════════════════════════════════════════",
+        "   بيانات الفاتورة والسداد",
+        "════════════════════════════════════════",
+        "",
+        "المورّد          : {{company.name}} ({{company.nameEn}})",
+        "العنوان          : {{company.address}}",
+        "الرقم الضريبي    : {{company.taxNumber}}",
+        "السجل التجاري    : {{company.commercialRegister}}",
+        "",
+        "المنتج           : {{product.name}} v{{product.version}} {{product.edition}}",
+        `الترخيص          : ${payload.type} — ${payload.expiryDate ? `ينتهي ${payload.expiryDate.slice(0, 10)}` : "دائم"}`,
+        `العميل           : ${cfg.customerName} — ${cfg.laundryName}`,
+        "",
+        "العملة           : {{invoice.currency}}",
+        "طرق السداد       : {{invoice.paymentMethods}}",
+        "بيانات التحويل   : {{invoice.bankDetails}}",
+        "",
+        "الضمان والصيانة  : {{legal.warranty}}",
+        "شروط الترخيص     : {{legal.licenseTerms}}",
+        "",
+        "ملاحظات          : {{invoice.notes}}",
+        "",
+        "للاستفسار: {{support.email}} · {{support.phone}}",
+      ].join("\n"),
+      branding,
+    ),
+  );
+
+  // ---------- 5. اقرأني ----------
   put(
     "اقرأني أولاً.txt",
     [
