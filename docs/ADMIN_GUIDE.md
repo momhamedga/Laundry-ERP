@@ -4,7 +4,7 @@ For administrators and branch managers.
 
 ## First-run
 
-1. Sign in with the seeded admin (`admin@laundry.local` / `Admin@12345`) and
+1. Sign in with the seeded admin (`##########` / `#######`) and
    **change the password immediately**.
 2. Create your **branch(es)**, **service categories** and **services** (with
    prices), and **staff accounts** with appropriate roles.
