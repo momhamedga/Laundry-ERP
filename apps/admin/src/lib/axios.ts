@@ -98,6 +98,11 @@ interface ApiErrorBody {
   errors?: { path: string; message: string }[];
 }
 
+/** هل الفشل بسبب تعذّر الوصول للخادم أصلاً (لا استجابة)؟ */
+export function isNetworkError(error: unknown): boolean {
+  return error instanceof AxiosError && !error.response;
+}
+
 /** استخراج رسالة خطأ قابلة للعرض من أي فشل */
 export function getErrorMessage(error: unknown): string {
   // منع الترخيص له رسالته الخاصة — لا يُعرض كخطأ عام غامض

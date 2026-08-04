@@ -44,8 +44,53 @@ interface DesktopLicenseApi {
   import(content?: string): Promise<DesktopLicenseStatus | null>;
 }
 
+/** حالة الخادم المحلّي المُدمج — يبثّها main أثناء الإقلاع */
+export type DesktopBackendStatus =
+  | "starting"
+  | "ready"
+  | "reusing-external"
+  | "crashed"
+  | "restarting"
+  | "stopped"
+  | "unconfigured";
+
 interface DesktopBridge {
   license: DesktopLicenseApi;
+  system?: {
+    /** يفتح مستنداً بعارض النظام الافتراضي؛ يعيد مسار الملفّ المؤقّت */
+    openDocument(base64: string, fileName: string): Promise<string>;
+  };
+  status?: {
+    backend(): Promise<DesktopBackendStatus>;
+    net(): Promise<"online" | "offline">;
+  };
+}
+
+/**
+ * رسالة دقيقة عند تعذّر الوصول للخادم داخل تطبيق سطح المكتب.
+ *
+ * الخادم مُدمج ومحلّي ويأخذ ~25 ثانية ليقلع، فرسالة «تأكد من اتصالك بالشبكة»
+ * مضلّلة تماماً: المستخدم يفحص الواي فاي بينما المشكلة أن النظام لم يجهز بعد.
+ * نُعيد null خارج Electron أو إن تعذّر تحديد الحالة، فيُستخدم النصّ العام.
+ */
+export async function desktopBackendHint(): Promise<string | null> {
+  const b = desktopBridge();
+  if (!b?.status) return null;
+  try {
+    switch (await b.status.backend()) {
+      case "starting":
+      case "restarting":
+        return "جارٍ تشغيل النظام… انتظر لحظات ثم أعد المحاولة.";
+      case "unconfigured":
+        return "لم يكتمل تجهيز هذا الجهاز. راجع مورّد النظام.";
+      case "crashed":
+        return "تعذّر تشغيل خادم النظام. أعد تشغيل البرنامج، وإن تكرّر راجع الدعم الفني.";
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
 }
 
 /** الجسر إن كنّا داخل Electron، وإلا null (متصفّح عادي). */

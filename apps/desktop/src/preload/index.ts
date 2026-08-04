@@ -188,6 +188,9 @@ const api = {
     clear: () => invoke<boolean>(INVOKE_CHANNELS.RECENT_CLEAR),
   },
   system: {
+    /** يحفظ مستنداً مؤقتاً ويفتحه ببرنامج العرض الافتراضي */
+    openDocument: (base64: string, fileName: string) =>
+      invoke<string>(INVOKE_CHANNELS.SYSTEM_OPEN_DOCUMENT, { base64, fileName }),
     openExternal: (url: string) => invoke<boolean>(INVOKE_CHANNELS.SYSTEM_OPEN_EXTERNAL, { url }),
   },
   status: {

@@ -75,7 +75,7 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
     setPdfLoading(true);
     try {
       const result = await pdfQuery.refetch();
-      if (result.data) openBlobInNewTab(result.data);
+      if (result.data) await openBlobInNewTab(result.data, false, `${invoice.invoiceNumber ?? "invoice"}.pdf`);
     } finally {
       setPdfLoading(false);
     }
@@ -85,7 +85,7 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
     setPrintLoading(true);
     try {
       const result = await printQuery.refetch();
-      if (result.data) openBlobInNewTab(result.data, true);
+      if (result.data) await openBlobInNewTab(result.data, true, `${invoice.invoiceNumber ?? "invoice"}.pdf`);
     } finally {
       setPrintLoading(false);
     }

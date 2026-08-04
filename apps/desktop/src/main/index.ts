@@ -1,4 +1,5 @@
 import { app, BrowserWindow, session } from "electron";
+import path from "node:path";
 import { APP_PROTOCOL, SINGLE_INSTANCE } from "./config.js";
 import { initLogging, scoped } from "./logger.js";
 import { applySessionSecurity, hardenWebContents } from "./security.js";
@@ -30,9 +31,24 @@ import { EVENT_CHANNELS } from "../shared/ipc.js";
 
 const log = scoped("main");
 
+/**
+ * مسار بيانات المستخدم مثبَّت صراحةً (Phase 15.5 — إصلاح).
+ *
+ * Electron يشتقّ userData من `productName` إن وُجد في package.json، وإلا من
+ * `name`. حتى v1.4.0 لم يكن هناك productName فكان المسار
+ * `%APPDATA%/@laundry/desktop`. في 15.5 صار prepare-branding يكتب
+ * `productName: "Laundry ERP"` ليشتقّ المُثبِّت هويته من ملفّ الهوية — فانتقل
+ * المسار إلى `%APPDATA%/Laundry ERP` وأصبحت كل بيانات التثبيتات القائمة
+ * (القاعدة المشفّرة، الترخيص، الإعدادات، النسخ الاحتياطي) غير مرئية للتطبيق.
+ *
+ * نثبّته على المسار التاريخي: اسم المنتج يبقى حرّاً للعرض والمُثبِّت، وبيانات
+ * العميل لا تتحرّك أبداً مهما تغيّرت الهوية.
+ */
+app.setPath("userData", path.join(app.getPath("appData"), "@laundry", "desktop"));
+
 // هوية التطبيق على ويندوز (تجميع شريط المهام + اسم مُرسِل الإشعارات الصحيح؛
-// بلا هذا قد تظهر الإشعارات باسم "Electron" بدل "Laundry ERP"). يطابق appId في
-// electron-builder.yml. مستقلّ عن signAndEditExecutable (Phase 12.2).
+// بلا هذا قد تظهر الإشعارات باسم "Electron" بدل اسم المنتج). يطابق appId في
+// إعداد electron-builder. مستقلّ عن signAndEditExecutable (Phase 12.2).
 if (process.platform === "win32") {
   app.setAppUserModelId("com.laundryerp.desktop");
 }

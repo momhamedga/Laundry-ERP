@@ -20,23 +20,27 @@ export function PaymentsSummaryCards() {
       <MetricCard
         title="إجمالي المدفوعات"
         value={String(total.data?.meta.total ?? "—")}
+        loading={total.isPending}
         icon={CreditCard}
       />
       <MetricCard
         title="مكتملة"
         value={String(completed.data?.meta.total ?? "—")}
+        loading={completed.isPending}
         icon={CheckCircle2}
         tone="success"
       />
       <MetricCard
         title="قيد الانتظار"
         value={String(pending.data?.meta.total ?? "—")}
+        loading={pending.isPending}
         icon={Clock}
         tone="warning"
       />
       <MetricCard
         title="مستردة"
         value={String(refunded.data?.meta.total ?? "—")}
+        loading={refunded.isPending}
         icon={RotateCcw}
         tone="destructive"
       />

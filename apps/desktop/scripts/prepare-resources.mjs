@@ -295,6 +295,44 @@ function flattenPnpm(srcNM, destNM) {
 require_(apiDist, "شغّل: pnpm --filter @laundry/api build");
 require_(standalone, "شغّل: pnpm --filter @laundry/admin build (يتطلّب output: standalone)");
 
+/**
+ * يرفض المتابعة إن كان البناء أقدم من المصدر.
+ *
+ * هذا السكربت ينسخ ما يجده ولا يبني، فبناء قديم يُشحن بصمت: نُصلح عيباً،
+ * نبني المُغلِّف، ونسلّم حزمة لا تحتوي الإصلاح أصلاً. حدث هذا فعلاً مع
+ * إصلاح رسالة انقطاع قاعدة البيانات، ولم يظهر إلا بفحص محتوى الحزمة يدوياً.
+ */
+function assertFresh(srcDir, outDir, label, fixHint) {
+  if (!existsSync(srcDir)) return;
+  const newest = (dir) => {
+    let t = 0;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+      const p = path.join(dir, e.name);
+      t = Math.max(t, e.isDirectory() ? newest(p) : statSync(p).mtimeMs);
+    }
+    return t;
+  };
+  const src = newest(srcDir);
+  const out = newest(outDir);
+  if (src > out) {
+    console.error(
+      `\n✗ بناء ${label} أقدم من مصدره — الحزمة ستُشحن بكود قديم.\n` +
+        `  آخر تعديل في المصدر : ${new Date(src).toLocaleString("ar-EG")}\n` +
+        `  آخر بناء            : ${new Date(out).toLocaleString("ar-EG")}\n` +
+        `  الحل                : ${fixHint}\n`,
+    );
+    process.exit(1);
+  }
+}
+
+assertFresh(
+  path.join(root, "apps", "api", "src"),
+  apiDist,
+  "الخادم (api)",
+  "pnpm --filter @laundry/api build",
+);
+
 rmSync(resources, { recursive: true, force: true });
 mkdirSync(path.join(resources, "api"), { recursive: true });
 mkdirSync(path.join(resources, "renderer"), { recursive: true });

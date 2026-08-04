@@ -91,6 +91,8 @@ export const INVOKE_CHANNELS = {
   RECENT_CLEAR: "recent:clear",
 
   SYSTEM_OPEN_EXTERNAL: "system:open-external",
+  /** يفتح مستنداً (PDF/إيصال) ببرنامج العرض الافتراضي في النظام */
+  SYSTEM_OPEN_DOCUMENT: "system:open-document",
   BACKEND_STATUS: "backend:status",
   NET_STATUS: "net:status",
 } as const;

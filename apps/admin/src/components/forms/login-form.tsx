@@ -13,7 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { getErrorMessage } from "@/lib/axios";
+import { getErrorMessage, isNetworkError } from "@/lib/axios";
+import { desktopBackendHint } from "@/lib/desktop";
 import { useAuthStore } from "@/store/auth-store";
 
 const loginSchema = z.object({
@@ -47,8 +48,11 @@ export function LoginForm() {
       toast.success("مرحباً بك 👋");
       router.replace("/");
     } catch (error) {
-      // أخطاء الخادم (بيانات خاطئة/حساب مقفول) وأخطاء الشبكة
-      setServerError(getErrorMessage(error));
+      // داخل تطبيق سطح المكتب الخادم مُدمج ومحلّي ويأخذ ~25 ثانية ليقلع، فرسالة
+      // «تأكد من اتصالك بالشبكة» تُرسل المستخدم يفحص الواي فاي بلا داعٍ. نسأل
+      // العملية الرئيسية عن حالة الخادم ونقول له السبب الحقيقي.
+      const hint = isNetworkError(error) ? await desktopBackendHint() : null;
+      setServerError(hint ?? getErrorMessage(error));
     }
   }
 

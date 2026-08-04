@@ -1,6 +1,6 @@
 {
   "name": "@laundry/desktop",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Professional Laundry Management System",
   "main": "dist/main/index.js",

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { scoped } from "../logger.js";
 import { getMainWindow } from "../windows/main-window.js";
 import {
@@ -352,6 +353,34 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
   handle(INVOKE_CHANNELS.UPDATE_CHECK, () => checkForUpdates());
   handle(INVOKE_CHANNELS.UPDATE_DOWNLOAD, () => downloadUpdate());
   handle(INVOKE_CHANNELS.UPDATE_INSTALL, () => installUpdate());
+
+
+  /**
+   * يفتح مستنداً ببرنامج العرض الافتراضي في النظام (Phase 15.5 — إصلاح).
+   *
+   * عارض PDF المدمج في Chromium لم يرسم داخل نافذة blob حتى مع تفعيل plugins،
+   * فكانت نافذة «عرض PDF» تُفتح فارغة. فتح الملفّ بعارض النظام أضمن وأفضل
+   * للمستخدم: يحصل على برنامجه المألوف بأدوات الطباعة والحفظ الكاملة.
+   *
+   * يُكتب في مجلّد مؤقّت داخل بيانات التطبيق ثم يُفتح — لا نكتب خارج نطاقنا،
+   * واسم الملفّ يُعقَّم فلا يمكن الخروج من المجلّد.
+   */
+  handle(INVOKE_CHANNELS.SYSTEM_OPEN_DOCUMENT, async (_e, p) => {
+    const o = assertObject(p);
+    const base64 = asString(o, "base64");
+    const raw = typeof o.fileName === "string" ? o.fileName : "document.pdf";
+    // basename يزيل أي مسار، والتعقيم يُبقي الحروف/الأرقام العربية واللاتينية فقط
+    const safe =
+      path.basename(raw).replace(/[^\p{L}\p{N}._-]+/gu, "_").slice(0, 80) || "document.pdf";
+    const dir = path.join(app.getPath("userData"), "documents");
+    await fs.mkdir(dir, { recursive: true });
+    const file = path.join(dir, safe);
+    await fs.writeFile(file, Buffer.from(base64, "base64"));
+    const err = await shell.openPath(file);
+    if (err) throw new Error(`تعذّر فتح المستند بعارض النظام: ${err}`);
+    log.info("opened document with system viewer:", safe);
+    return file;
+  });
 
   // ==================== License (Phase 15B) ====================
   // للقراءة فقط + استيراد ملفّ. لا يوجد أي مسار لإصدار ترخيص من داخل التطبيق.

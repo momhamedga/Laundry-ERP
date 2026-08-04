@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test test/license.test.mjs test/enforcement.test.mjs"
+    "test": "node --test test/license.test.mjs test/enforcement.test.mjs test/csp-origins.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

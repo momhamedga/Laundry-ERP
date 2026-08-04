@@ -32,7 +32,7 @@ export function PaymentReceiptButton({ paymentId, status, variant = "default" }:
     setLoading(true);
     try {
       const result = await receiptQuery.refetch();
-      if (result.data) openBlobInNewTab(result.data, true);
+      if (result.data) await openBlobInNewTab(result.data, true, "receipt.pdf");
       else if (result.error) toast.error(getErrorMessage(result.error));
     } finally {
       setLoading(false);

@@ -8,7 +8,7 @@
   "product": {
     "name": "Laundry ERP",
     "nameAr": "نظام إدارة المغاسل",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "edition": "Stable",
     "tagline": "Professional Laundry Management System",
     "taglineAr": "نظام احترافي متكامل لإدارة المغاسل",
@@ -22,15 +22,15 @@
     "owner": "Mohamed Gamal",
     "website": "https://mojimmy-portfolio.vercel.app",
     "email": "midoga400@gmail.com",
-    "phone": "+971 589915968",
+    "phone": "+20 1214115724",
     "address": "Egypt",
     "taxNumber": "",
     "commercialRegister": ""
   },
   "support": {
     "email": "midoga400@gmail.com",
-    "phone": "+971 589915968",
-    "whatsapp": "+971 589915968",
+    "phone": "+20 1214115724",
+    "whatsapp": "+20 1214115724",
     "website": "https://mojimmy-portfolio.vercel.app",
     "hours": "Sunday - Thursday | 09:00 AM - 06:00 PM (GMT+2)",
     "responseTime": "Within one business day",

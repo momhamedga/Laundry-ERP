@@ -14,6 +14,20 @@ export const API_PORT = Number(process.env.DESKTOP_API_PORT ?? 4000);
 export const API_HEALTH_URL = `http://127.0.0.1:${API_PORT}/api/v1/health`;
 export const API_ORIGIN = `http://127.0.0.1:${API_PORT}`;
 
+/**
+ * ⚠️ نفس المصيدة أدناه، لكن من جهة CSP هذه المرّة.
+ *
+ * الواجهة مبنيّة على `NEXT_PUBLIC_API_URL=http://localhost:4000`، بينما
+ * `API_ORIGIN` يستخدم `127.0.0.1`. المتصفّح يعتبرهما **أصلين مختلفين**، فسياسة
+ * `connect-src` التي تسمح بـ 127.0.0.1 وحده كانت تحجب كل طلب من الواجهة قبل أن
+ * يغادر — لا أثر له في سجلّ الخادم، ورسالة "تعذّر الاتصال" تُرسل المستخدم يفحص
+ * شبكته. النتيجة: تسجيل الدخول مستحيل في النسخة المُغلَّفة.
+ *
+ * نسمح بالصيغتين: العنوان الذي نستدعيه نحن داخلياً (127.0.0.1) والعنوان الذي
+ * تستدعيه الواجهة (localhost).
+ */
+export const API_ORIGINS = [API_ORIGIN, `http://localhost:${API_PORT}`];
+
 /** منفذ الـ Renderer (Next) في التطوير - خادم Next dev القائم */
 export const DEV_RENDERER_URL =
   process.env.DESKTOP_RENDERER_URL ?? "http://localhost:3000";
@@ -33,7 +47,7 @@ export const PROD_RENDERER_URL = `http://${PROD_RENDERER_HOST}:${PROD_RENDERER_P
 
 /** أصول التنقّل المسموح بها داخل النافذة (حماية: منع أي navigation خارجها) */
 export function allowedNavigationOrigins(): string[] {
-  return [DEV_RENDERER_URL, PROD_RENDERER_URL, API_ORIGIN].map((u) => new URL(u).origin);
+  return [DEV_RENDERER_URL, PROD_RENDERER_URL, ...API_ORIGINS].map((u) => new URL(u).origin);
 }
 
 /** مجلد الموارد المُجمّعة عند التغليف (extraResources) */

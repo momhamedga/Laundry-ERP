@@ -14,13 +14,15 @@ const log = scoped("security");
 function buildCsp(): string {
   const origins = allowedNavigationOrigins().join(" ");
   return [
-    "default-src 'self'",
+    "default-src 'self' blob:",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src 'self' ${origins} ws: wss:`,
     "object-src 'none'",
+    // مستندات PDF التي يولّدها التطبيق تُفتح كـ blob: في نافذة مستقلّة
+    "frame-src 'self' blob:",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -36,10 +38,40 @@ function buildCsp(): string {
 export function hardenWebContents(contents: WebContents): void {
   const allowed = allowedNavigationOrigins();
 
-  // فتح نوافذ جديدة: ارفض داخلياً، وافتح http/https الموثوقة خارجياً
   contents.setWindowOpenHandler(({ url }) => {
+    /**
+     * مستندات blob: يولّدها التطبيق نفسه (فاتورة PDF، إيصال دفع) ويفتحها
+     * `openBlobInNewTab`. رفضها سابقاً كان يُعطّل «عرض PDF» و«تنزيل» و«طباعة»
+     * بصمت — الـ API يُنتج الملفّ ثم تُحجب نافذة عرضه، فيرى المستخدم نافذة
+     * سوداء أو لا شيء. المحتوى محلّي المنشأ ومن أصلنا، فنسمح بنافذة معاينة
+     * مُصلَّبة بلا تكامل Node.
+     */
+    if (url.startsWith("blob:")) {
+      const origin = url.slice("blob:".length);
+      if (allowed.some((o) => origin.startsWith(o))) {
+        return {
+          action: "allow",
+          overrideBrowserWindowOptions: {
+            autoHideMenuBar: true,
+            webPreferences: {
+              contextIsolation: true,
+              sandbox: true,
+              nodeIntegration: false,
+              // عارض PDF المدمج في Chromium مُعطَّل افتراضياً في Electron؛ بدونه
+              // تُفتح النافذة فارغة تماماً بدل عرض الفاتورة. لا علاقة له بإضافات
+              // خارجية — هو العارض الداخلي فقط.
+              plugins: true,
+            },
+          },
+        };
+      }
+      log.warn("blocked blob window from unexpected origin:", url.slice(0, 80));
+      return { action: "deny" };
+    }
+
+    // روابط الويب تُفتح في المتصفّح الخارجي لا داخل التطبيق
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-    else log.warn("blocked window.open for non-http url:", url);
+    else log.warn("blocked window.open for non-http url:", url.slice(0, 80));
     return { action: "deny" };
   });
 
