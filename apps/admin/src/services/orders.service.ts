@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/axios";
+import { createOrderLocally } from "@/lib/offline-orders";
+import { route } from "@/lib/offline-router";
 import type { ApiListResponse, ApiResponse } from "@/types";
 import type {
   CancelOrderInput,
@@ -47,9 +49,21 @@ export async function getOrderHistory(id: string): Promise<OrderHistoryEntry[]> 
   return data.data.history;
 }
 
+/**
+ * إنشاء طلب — يعمل دون اتصال.
+ *
+ * التوجيه هنا لا في الخطّاف كي يستفيد كل مستدعٍ بلا تغيير، ولأن هذا هو
+ * الموضع الوحيد الذي يعرف شكل المدخل والمخرج معاً فيتكفّل بالتحويل بينهما.
+ */
 export async function createOrder(input: CreateOrderInput): Promise<OrderDetail> {
-  const { data } = await apiClient.post<ApiResponse<{ order: OrderDetail }>>("/orders", input);
-  return data.data.order;
+  return route({
+    label: "orders.create",
+    remote: async () => {
+      const { data } = await apiClient.post<ApiResponse<{ order: OrderDetail }>>("/orders", input);
+      return data.data.order;
+    },
+    local: () => createOrderLocally(input),
+  });
 }
 
 /** تعديل تفاصيل الطلب (dueDate/discount/notes) - يُرفض بعد DELIVERED/CANCELLED بالخادم */

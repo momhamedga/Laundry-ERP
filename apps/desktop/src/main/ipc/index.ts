@@ -41,6 +41,8 @@ import {
   createPayment,
   listPayments,
   putCache,
+  readCache,
+  seedServerCustomers,
   listAll as listQueue,
   listFailed,
   retryOp,
@@ -58,6 +60,7 @@ import type {
   DesktopWindowName,
   ListQuery,
   NewCustomer,
+  ServerCustomer,
   NewOrder,
   NewPayment,
   RawPrintOptions,
@@ -318,6 +321,27 @@ export function registerIpc(deps: { backend: BackendManager; network: NetworkMon
     if (!CACHE_ENTITIES.includes(entity)) throw new Error(`Invalid cache entity: ${String(entity)}`);
     if (!Array.isArray(o.rows)) throw new Error("rows must be an array");
     return putCache(entity, o.rows as Record<string, unknown>[]);
+  });
+
+  /**
+   * قراءة الكاش — الوجه المقابل لـ CACHE_PUT.
+   *
+   * كان المستودع يوفّر readCache دون أن يعرّضها أي قناة، فكانت الواجهة تملأ
+   * الكاش ولا تستطيع قراءته. وبلا القراءة يستحيل إنشاء طلب دون اتصال: لا
+   * كتالوج خدمات يُختار منه ولا أسعار تُحسب.
+   */
+  handle(INVOKE_CHANNELS.OFFLINE_CACHE_READ, (_e, p) => {
+    const o = assertObject(p);
+    const entity = o.entity as CacheEntity;
+    if (!CACHE_ENTITIES.includes(entity)) throw new Error(`Invalid cache entity: ${String(entity)}`);
+    return readCache(entity);
+  });
+
+  /** بذر عملاء الخادم محلّياً — لا يلمس صفّاً ينتظر المزامنة */
+  handle(INVOKE_CHANNELS.OFFLINE_CUSTOMER_SEED, (_e, p) => {
+    const o = assertObject(p);
+    if (!Array.isArray(o.rows)) throw new Error("rows must be an array");
+    return seedServerCustomers(o.rows as ServerCustomer[]);
   });
   handle(INVOKE_CHANNELS.OFFLINE_QUEUE_LIST, (_e, p) => {
     const o = (p ?? {}) as { limit?: number };

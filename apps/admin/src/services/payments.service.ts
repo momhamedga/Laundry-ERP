@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/axios";
+import { createPaymentLocally } from "@/lib/offline-payments";
+import { route } from "@/lib/offline-router";
 import type { ApiListResponse, ApiResponse } from "@/types";
 import type {
   CancelPaymentInput,
@@ -38,9 +40,16 @@ export async function getPayment(id: string): Promise<Payment> {
   return data.data.payment;
 }
 
+/** تسجيل دفعة — يعمل دون اتصال ويُدرَج في طابور المزامنة */
 export async function createPayment(input: CreatePaymentInput): Promise<Payment> {
-  const { data } = await apiClient.post<ApiResponse<{ payment: Payment }>>("/payments", input);
-  return data.data.payment;
+  return route({
+    label: "payments.create",
+    remote: async () => {
+      const { data } = await apiClient.post<ApiResponse<{ payment: Payment }>>("/payments", input);
+      return data.data.payment;
+    },
+    local: () => createPaymentLocally(input),
+  });
 }
 
 /** COMPLETED فقط - يرفضه الخادم لأي حالة أخرى (راجع payments.service.ts refund) */

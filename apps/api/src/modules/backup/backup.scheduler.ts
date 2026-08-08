@@ -1,3 +1,9 @@
+import {
+  createBackoff,
+  recordFailure,
+  recordSuccess,
+  shouldSkip,
+} from "../../utils/scheduler-backoff.js";
 import type { BackupService } from "./backup.service.js";
 
 /** دورة الفحص - كل دقيقة تكفي لدقّة جدولة "HH:mm" */
@@ -10,14 +16,22 @@ const BACKUP_SCHEDULER_INTERVAL_MS = 60_000;
  */
 export function startBackupScheduler(service: BackupService): () => void {
   let isRunning = false;
+  const backoff = createBackoff();
 
   const timer = setInterval(() => {
     if (isRunning) return;
+    // نفس تراجع مجدول الإشعارات — انظر utils/scheduler-backoff.ts
+    if (shouldSkip(backoff)) return;
     isRunning = true;
     service
       .runDueScheduledBackup()
+      .then(() => {
+        const msg = recordSuccess(backoff);
+        if (msg) console.info("[backup]", msg);
+      })
       .catch((err: unknown) => {
-        console.error("[backup] scheduler tick failed:", err);
+        const note = recordFailure(backoff, BACKUP_SCHEDULER_INTERVAL_MS);
+        if (note) console.error("[backup] scheduler tick failed:", err, `— ${note}`);
       })
       .finally(() => {
         isRunning = false;

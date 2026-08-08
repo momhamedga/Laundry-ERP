@@ -1,3 +1,5 @@
+import type { DesktopOfflineApi, SyncState } from "@/lib/offline-types";
+
 /**
  * وصول مُصان بالأنواع لجسر Electron (window.desktop).
  *
@@ -54,6 +56,9 @@ export type DesktopBackendStatus =
   | "stopped"
   | "unconfigured";
 
+/** حالة الاتصال كما يقيسها الـ main: نجاح فحص /health الذي يلمس قاعدة البيانات */
+export type DesktopNetStatus = "online" | "offline";
+
 interface DesktopBridge {
   license: DesktopLicenseApi;
   system?: {
@@ -62,7 +67,16 @@ interface DesktopBridge {
   };
   status?: {
     backend(): Promise<DesktopBackendStatus>;
-    net(): Promise<"online" | "offline">;
+    net(): Promise<DesktopNetStatus>;
+  };
+  /** طبقة SQLite المحلّية + طابور المزامنة (Phase 11.6) */
+  offline?: DesktopOfflineApi;
+  /** يكتب في سجلّ التطبيق — يجمع سطور الواجهة والـ main في ملفّ واحد */
+  log?(level: "info" | "warn" | "error", message: string): void;
+  on?: {
+    /** يعيد دالة إلغاء الاشتراك */
+    netStatus(cb: (s: DesktopNetStatus) => void): () => void;
+    syncStatus(cb: (s: SyncState) => void): () => void;
   };
 }
 

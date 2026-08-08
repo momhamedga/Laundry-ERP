@@ -3,6 +3,7 @@ import type {
   ListQuery,
   LocalCustomer,
   NewCustomer,
+  ServerCustomer,
 } from "../../../shared/ipc.js";
 import { bit, getDb, localId, nowIso, tx, type DB } from "./base.js";
 import { enqueue } from "./sync-queue.repo.js";
@@ -39,6 +40,58 @@ export function listCustomers(q: ListQuery = {}): LocalCustomer[] {
   return getDb()
     .prepare(`SELECT ${COLS} FROM customers ORDER BY updated_at DESC LIMIT ? OFFSET ?`)
     .all(limit, offset) as LocalCustomer[];
+}
+
+/**
+ * يبذر عملاء الخادم في الجدول المحلّي ليكونوا متاحين دون اتصال.
+ *
+ * ═══════════ لماذا لا يمرّ هذا عبر طبقة الكاش ═══════════
+ * العملاء ليسوا كياناً للقراءة فقط: تُنشأ سجلّاتهم دون اتصال وتُزامَن لاحقاً،
+ * فمكانهم هذا الجدول بأعلامه لا جدول كاش منفصل. وبدون هذا البذر يفتح
+ * الموظّف معالج الطلب دون اتصال فلا يجد عميلاً واحداً من عملائه، فيُنشئ
+ * نسخة مكرّرة من عميل قائم — وهو ضرر أسوأ من تعذّر إنشاء الطلب.
+ *
+ * لا يلمس الصفوف المتّسخة إطلاقاً: صفّ ينتظر المزامنة يحمل تعديلاً لم يصل
+ * الخادم بعد، فالكتابة فوقه بنسخة الخادم تمحو عمل المستخدم. ولا يُدرِج أي
+ * عملية في طابور المزامنة — هذه بيانات قادمة من الخادم لا ذاهبة إليه.
+ */
+export function seedServerCustomers(rows: ServerCustomer[]): number {
+  if (!Array.isArray(rows) || rows.length === 0) return 0;
+
+  return tx((d) => {
+    const stmt = d.prepare(
+      `INSERT INTO customers (id, name, phone, email, address, is_active, created_at, updated_at, _local, _dirty, _synced_at)
+       VALUES (@id, @name, @phone, @email, @address, @is_active, @created_at, @updated_at, 0, 0, @synced_at)
+       ON CONFLICT(id) DO UPDATE SET
+         name       = excluded.name,
+         phone      = excluded.phone,
+         email      = excluded.email,
+         address    = excluded.address,
+         is_active  = excluded.is_active,
+         updated_at = excluded.updated_at,
+         _synced_at = excluded._synced_at
+       WHERE customers._dirty = 0`,
+    );
+
+    const now = nowIso();
+    let n = 0;
+    for (const r of rows) {
+      if (!r?.id || typeof r.name !== "string") continue;
+      stmt.run({
+        id: r.id,
+        name: r.name,
+        phone: r.phone ?? null,
+        email: r.email ?? null,
+        address: r.address ?? null,
+        is_active: bit(r.isActive !== false),
+        created_at: r.createdAt ?? now,
+        updated_at: r.updatedAt ?? now,
+        synced_at: now,
+      });
+      n++;
+    }
+    return n;
+  });
 }
 
 /** ينشئ عميلاً محلّياً (offline) ويُدرِج عملية مزامنة create. */

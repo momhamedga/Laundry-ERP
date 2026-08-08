@@ -23,6 +23,7 @@ import {
   type LocalPayment,
   type NetStatus,
   type NewCustomer,
+  type ServerCustomer,
   type NewOrder,
   type NewPayment,
   type OfflineDbStatus,
@@ -142,6 +143,8 @@ const api = {
         invoke<LocalCustomer[]>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_LIST, query ?? {}),
       get: (id: string) =>
         invoke<LocalCustomer | null>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_GET, { id }),
+      seed: (rows: ServerCustomer[]) =>
+        invoke<number>(INVOKE_CHANNELS.OFFLINE_CUSTOMER_SEED, { rows }),
     },
     orders: {
       create: (input: NewOrder) =>
@@ -160,6 +163,8 @@ const api = {
     cache: {
       put: (entity: CacheEntity, rows: Record<string, unknown>[]) =>
         invoke<number>(INVOKE_CHANNELS.OFFLINE_CACHE_PUT, { entity, rows }),
+      read: (entity: CacheEntity) =>
+        invoke<Record<string, unknown>[]>(INVOKE_CHANNELS.OFFLINE_CACHE_READ, { entity }),
     },
     queue: {
       list: (limit?: number) =>

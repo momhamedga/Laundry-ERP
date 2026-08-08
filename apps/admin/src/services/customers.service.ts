@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/axios";
+import { getCustomerProfileLocally, listCustomersLocally } from "@/lib/offline-customers";
+import { route } from "@/lib/offline-router";
 import type { ApiListResponse, ApiResponse } from "@/types";
 import type {
   Customer,
@@ -22,14 +24,21 @@ function toQueryParams(params: ListCustomersParams): Record<string, string> {
   return query;
 }
 
+/** قائمة العملاء — تقرأ من الجدول المحلّي حين تتعذّر قاعدة البيانات */
 export async function listCustomers(
   params: ListCustomersParams,
 ): Promise<ListCustomersResult> {
-  const { data } = await apiClient.get<ApiListResponse<{ customers: Customer[] }>>(
-    "/customers",
-    { params: toQueryParams(params) },
-  );
-  return { customers: data.data.customers, meta: data.meta };
+  return route({
+    label: "customers.list",
+    remote: async () => {
+      const { data } = await apiClient.get<ApiListResponse<{ customers: Customer[] }>>(
+        "/customers",
+        { params: toQueryParams(params) },
+      );
+      return { customers: data.data.customers, meta: data.meta };
+    },
+    local: () => listCustomersLocally(params),
+  });
 }
 
 export async function createCustomer(input: CustomerMutationInput): Promise<Customer> {
@@ -73,9 +82,16 @@ export async function restoreCustomer(id: string): Promise<Customer> {
   return data.data.customer;
 }
 
+/** ملفّ العميل — يقرأ محلّياً حين تتعذّر قاعدة البيانات */
 export async function getCustomerProfile(id: string): Promise<CustomerProfile> {
-  const { data } = await apiClient.get<ApiResponse<CustomerProfile>>(
-    `/customers/${id}/profile`,
-  );
-  return data.data;
+  return route({
+    label: "customers.profile",
+    remote: async () => {
+      const { data } = await apiClient.get<ApiResponse<CustomerProfile>>(
+        `/customers/${id}/profile`,
+      );
+      return data.data;
+    },
+    local: () => getCustomerProfileLocally(id),
+  });
 }

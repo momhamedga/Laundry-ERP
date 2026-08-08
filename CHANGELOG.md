@@ -4,6 +4,61 @@ All notable changes to the Laundry ERP desktop application are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.4] — 2026-08-08
+
+### Fixed
+- **Offline order creation now reaches the local database.** Four calls the order
+  wizard depends on still went to the server with no local path — customer
+  profile, active branches, payment creation, and the branch cache — so picking a
+  customer offline succeeded and the next step failed. All four are routed now.
+
+## [2.1.3] — 2026-08-07
+
+### Fixed
+- **Screens never asked the offline router.** React Query treated its cached
+  result as valid, so a wizard left open while the connection dropped kept
+  showing data from before the outage instead of reading locally. Connectivity
+  changes now invalidate the cache, in both directions.
+
+## [2.1.2] — 2026-08-07
+
+### Fixed
+- **Sync arming gave up permanently** if the Electron bridge was not ready at
+  mount, leaving the queue unarmed and the cache unfilled after login.
+- Route decisions and cache results are logged, so a silent failure is visible.
+
+## [2.1.1] — 2026-08-06
+
+### Fixed
+- **The offline cache was never populated.** The catalogue request asked for 500
+  rows while the server caps a page at 100, so every fetch was rejected with 400
+  and swallowed by a silent `catch`. Requests are paged now, and failures log.
+
+## [2.1.0] — 2026-08-06
+
+### Added
+- **Offline operation for the order path.** Orders, customers, services and
+  payments read from and write to the encrypted local SQLite database when the
+  cloud database is unreachable, and the queued work syncs on reconnect. No API,
+  schema, or authentication change: the offline path bypasses the server
+  entirely through Electron IPC.
+
+## [2.0.1] — 2026-08-05
+
+### Fixed
+- **Login was impossible in the packaged app.** The CSP allowed `127.0.0.1` only
+  while the renderer calls `localhost` — different origins to a browser — so the
+  request was blocked before it left, leaving no trace in the server log.
+- **Upgrades lost all data.** Adding `productName` moved `userData` away from
+  `@laundry/desktop`, orphaning the database, licence, settings and backups. The
+  path is now pinned explicitly.
+- PDF viewing, downloading and printing: Chromium's built-in viewer does not
+  render inside Electron, so documents open in the system's default reader.
+- A misleading "check your network" message during the ~25s local server start.
+- Garbled Arabic console output on Windows.
+- `Internal server error` in an all-Arabic interface. Database outages now say so
+  in Arabic; the code Prisma actually returns when offline is `P2024`, not `P1001`.
+
 ## [2.0.0] — 2026-08-04 — Commercial release
 
 First commercially shippable build. No changes to business workflows, database

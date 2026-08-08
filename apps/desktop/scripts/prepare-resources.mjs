@@ -1,4 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -340,7 +341,22 @@ mkdirSync(path.join(resources, "renderer"), { recursive: true });
 // ==================== API ====================
 cpSync(apiDist, path.join(resources, "api", "dist"), { recursive: true });
 cpSync(apiPkg, path.join(resources, "api", "package.json"));
-if (existsSync(apiPrisma)) cpSync(apiPrisma, path.join(resources, "api", "prisma"), { recursive: true });
+/**
+ * نسخ prisma بلا سكربتات البذر.
+ *
+ * seed.ts يحمل بيانات اعتماد المدير الافتراضية نصّاً صريحاً
+ * (البريد وكلمة السرّ)، وكان يُشحن في كل حزمة عميل فيقرؤه أي مستخدم
+ * يفتح مجلّد التثبيت. ولا يُستدعى وقت التشغيل إطلاقاً — البذر يحدث عند
+ * التجهيز لدى المورّد لا على جهاز العميل — فاستبعاده لا يمسّ أي وظيفة.
+ *
+ * schema.prisma والهجرات تبقى: لا تحمل أسراراً وقد يحتاجها التشخيص.
+ */
+if (existsSync(apiPrisma)) {
+  cpSync(apiPrisma, path.join(resources, "api", "prisma"), {
+    recursive: true,
+    filter: (src) => !/[\\/]seed[\w-]*\.(ts|js|mjs)$/i.test(src),
+  });
+}
 if (existsSync(apiNodeModules)) {
   const nApi = flattenPnpm(apiNodeModules, path.join(resources, "api", "node_modules"));
   console.log(`• node_modules مسطّح للـ API: ${nApi} حزمة (بلا روابط رمزية)`);
@@ -365,5 +381,104 @@ if (existsSync(nextStatic))
   cpSync(nextStatic, path.join(rendererDest, "apps", "admin", ".next", "static"), { recursive: true });
 if (existsSync(adminPublic))
   cpSync(adminPublic, path.join(rendererDest, "apps", "admin", "public"), { recursive: true });
+
+/**
+ * حارس تسرّب الأسرار — يوقف التغليف إن وُجد سرّ حيّ داخل المشحون.
+ *
+ * شُحن seed.ts في كل حزمة عميل حاملاً بيانات اعتماد المدير الافتراضية نصّاً
+ * صريحاً، ولم يكتشفه أي فحص آلي لأن لا فحص كان يقرأ محتوى المشحون أصلاً.
+ * الفحص اليدوي لا يتكرّر مع كل بناء؛ هذا الحارس يتكرّر.
+ *
+ * نفحص ملفّات المصدر والإعداد فقط: node_modules مليئة بأمثلة ومَعارِف
+ * اختبار تُطلق إنذارات كاذبة تُفقد الحارس قيمته.
+ */
+function assertNoSecrets(dir) {
+  const RULES = [
+    [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "مفتاح خاص"],
+    [/postgres(ql)?:\/\/[^\s"']*:[^\s"'@]+@/i, "رابط قاعدة بيانات ببيانات اعتماد"],
+    [/\bADMIN_PASSWORD\s*=\s*["'][^"']+["']/, "كلمة سرّ مدير مكتوبة صراحةً"],
+    [/\bJWT_(ACCESS|REFRESH)_SECRET\s*=\s*["'][^"']{8,}["']/, "سرّ JWT"],
+  ];
+  const EXT = /\.(ts|tsx|js|mjs|cjs|json|env|yml|yaml|pem|key|txt|md)$/i;
+  const hits = [];
+
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === ".next") continue;
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) {
+        walk(p);
+        continue;
+      }
+      if (!EXT.test(e.name)) continue;
+      if (statSync(p).size > 2_000_000) continue;
+      let body;
+      try {
+        body = readFileSync(p, "utf8");
+      } catch {
+        continue;
+      }
+      for (const [re, label] of RULES) {
+        if (re.test(body)) hits.push(`${label} — ${path.relative(dir, p)}`);
+      }
+    }
+  };
+  walk(dir);
+
+  if (hits.length > 0) {
+    console.error("\n✗ أسرار داخل ما سيُشحن — أُوقف التغليف:\n");
+    for (const h of hits) console.error(`    ${h}`);
+    console.error("");
+    process.exit(1);
+  }
+  console.log("• فحص الأسرار: نظيف");
+}
+
+/**
+ * يتحقّق أن جافاسكربت المشحونة قابلة للتحليل فعلاً.
+ *
+ * شُحنت حزمة كاملة لا تفتح: بايت واحد في وقت تشغيل Next اختلف عن الأصل
+ * (`5d` صارت `dd` — بِتّ واحد)، فرمى المحلّل «Invalid or unexpected token»
+ * وتعذّر إقلاع الواجهة. ولم يعترض شيء: البناء رجع RC=0، والحجم مطابق،
+ * وفحص الأسرار نظيف — لأن لا فحص كان يسأل السؤال البسيط: هل هذا كود صالح؟
+ *
+ * نقتصر على أوقات التشغيل الحرجة ونقاط الدخول: فحص كل ملفّ في 500 ميغابايت
+ * يطيل كل بناء لدقائق مقابل عائد ضئيل، وهذه الملفّات هي التي يقف عليها
+ * الإقلاع كلّه.
+ */
+function assertParsable(root) {
+  const targets = [];
+  const collect = (dir, depth = 0) => {
+    if (!existsSync(dir) || depth > 6) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) collect(p, depth + 1);
+      else if (/\.(js|cjs)$/.test(e.name) && statSync(p).size > 50_000) targets.push(p);
+    }
+  };
+  collect(path.join(root, "renderer", "node_modules", "next", "dist", "compiled", "next-server"));
+  collect(path.join(root, "renderer", "apps", "admin", ".next", "server", "chunks"), 2);
+  targets.push(path.join(root, "renderer", "apps", "admin", "server.js"));
+  targets.push(path.join(root, "api", "dist", "server.js"));
+
+  const bad = [];
+  for (const t of targets) {
+    if (!existsSync(t)) continue;
+    const r = spawnSync(process.execPath, ["--check", t], { encoding: "utf8" });
+    if (r.status !== 0) bad.push(`${path.relative(root, t)} — ${(r.stderr || "").split("\n")[2] ?? "غير قابل للتحليل"}`);
+  }
+
+  if (bad.length > 0) {
+    console.error("\n✗ ملفّات غير قابلة للتحليل داخل ما سيُشحن — أُوقف التغليف:\n");
+    for (const b of bad) console.error(`    ${b}`);
+    console.error("\n  السبب الأرجح بناء .next متّسخ. جرّب:");
+    console.error("    rm -rf apps/admin/.next && pnpm --filter @laundry/admin run build\n");
+    process.exit(1);
+  }
+  console.log(`• فحص قابلية التحليل: ${targets.length} ملفّاً حرجاً — سليمة`);
+}
+
+assertNoSecrets(resources);
+assertParsable(resources);
 
 console.log("✓ resources/ جاهزة (api + renderer) بـ node_modules مسطّح بلا روابط.");

@@ -52,6 +52,8 @@ export const INVOKE_CHANNELS = {
   OFFLINE_PAYMENT_CREATE: "offline:payment:create",
   OFFLINE_PAYMENT_LIST: "offline:payment:list",
   OFFLINE_CACHE_PUT: "offline:cache:put",
+  OFFLINE_CACHE_READ: "offline:cache:read",
+  OFFLINE_CUSTOMER_SEED: "offline:customer:seed",
   OFFLINE_QUEUE_LIST: "offline:queue:list",
 
   // Phase 11.6C — Sync Engine
@@ -314,6 +316,18 @@ export interface NewCustomer {
   email?: string;
   address?: string;
 }
+/** عميل قادم من الخادم لبذره محلّياً — أسماء الحقول كما يعيدها الـ API */
+export interface ServerCustomer {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CustomerPatch {
   name?: string;
   phone?: string;

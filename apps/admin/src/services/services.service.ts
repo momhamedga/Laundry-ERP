@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/axios";
+import { listServicesLocally } from "@/lib/offline-catalog";
+import { route } from "@/lib/offline-router";
 import type { ApiListResponse, ApiResponse } from "@/types";
 import type {
   CreateServiceInput,
@@ -23,11 +25,18 @@ function toQueryParams(params: ListServicesParams): Record<string, string> {
   return query;
 }
 
+/** قائمة الخدمات — تقرأ من الكاش المحلّي حين تتعذّر قاعدة البيانات */
 export async function listServices(params: ListServicesParams): Promise<ListServicesResult> {
-  const { data } = await apiClient.get<ApiListResponse<{ services: Service[] }>>("/services", {
-    params: toQueryParams(params),
+  return route({
+    label: "services.list",
+    remote: async () => {
+      const { data } = await apiClient.get<ApiListResponse<{ services: Service[] }>>("/services", {
+        params: toQueryParams(params),
+      });
+      return { services: data.data.services, meta: data.meta };
+    },
+    local: () => listServicesLocally(params),
   });
-  return { services: data.data.services, meta: data.meta };
 }
 
 export async function createService(input: CreateServiceInput): Promise<Service> {

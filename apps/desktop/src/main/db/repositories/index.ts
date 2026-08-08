@@ -7,6 +7,7 @@ export {
   updateCustomer,
   listCustomers,
   getCustomer,
+  seedServerCustomers,
 } from "./customers.repo.js";
 export { createOrder, listOrders, getOrder } from "./orders.repo.js";
 export { createPayment, listPayments, getPayment } from "./payments.repo.js";

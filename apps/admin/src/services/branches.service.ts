@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/axios";
+import { listActiveBranchesLocally } from "@/lib/offline-branches";
+import { route } from "@/lib/offline-router";
 import type { ApiListResponse, ApiResponse } from "@/types";
 import type { Branch } from "@/types/orders";
 import type {
@@ -14,10 +16,16 @@ import type {
  * يُستهلك من الواجهة قبل الآن. يُستخدم هنا حصراً لتعبئة فلتر الفرع.
  */
 export async function listActiveBranches(): Promise<Branch[]> {
-  const { data } = await apiClient.get<ApiListResponse<{ branches: Branch[] }>>("/branches", {
-    params: { limit: 100, isActive: "true", sortBy: "name", sortOrder: "asc" },
+  return route({
+    label: "branches.active",
+    remote: async () => {
+      const { data } = await apiClient.get<ApiListResponse<{ branches: Branch[] }>>("/branches", {
+        params: { limit: 100, isActive: "true", sortBy: "name", sortOrder: "asc" },
+      });
+      return data.data.branches;
+    },
+    local: () => listActiveBranchesLocally(),
   });
-  return data.data.branches;
 }
 
 // ==================== Branches Management (Full CRUD) ====================
