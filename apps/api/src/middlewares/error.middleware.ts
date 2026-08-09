@@ -47,6 +47,27 @@ export function errorHandler(
     return;
   }
 
+  /**
+   * أخطاء تحليل الجسم من body-parser تحمل حالتها الصحيحة وتسقط هنا بلا داعٍ.
+   *
+   * كانت حمولة تتجاوز الحدّ (1MB) تُرجِع 500 ورسالة «خطأ غير متوقّع في النظام»،
+   * وهي إفادة خاطئة مرّتين: الحالة تقول عطل خادم بينما الخطأ من العميل، والسجلّ
+   * يمتلئ بـ«Unhandled error» لكل طلب كبير — فيصير إغراق السجلّ ممكناً بطلبات
+   * لا تحتاج مصادقة أصلاً.
+   */
+  const parseErr = err as { type?: string; status?: number; statusCode?: number };
+  if (typeof parseErr.type === "string" && parseErr.type.startsWith("entity.")) {
+    const status = parseErr.status ?? parseErr.statusCode ?? 400;
+    res.status(status).json({
+      success: false,
+      message:
+        status === 413
+          ? "حجم البيانات المُرسَلة يتجاوز الحدّ المسموح."
+          : "تعذّر قراءة البيانات المُرسَلة. تأكّد من صحّة الطلب.",
+    });
+    return;
+  }
+
   console.error("💥 Unhandled error:", err);
 
   // انقطاع الاتصال بقاعدة البيانات ليس خطأً برمجياً، ورسالة «Internal server error»

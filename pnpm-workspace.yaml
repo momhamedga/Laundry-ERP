@@ -25,11 +25,25 @@ overrides:
   "brace-expansion@5": "^5.0.8"
   postcss: "^8.5.25"
   sharp: "^0.35.3"
+# ==================== سكربتات البناء المُقرَّة ====================
+# pnpm يحجب سكربتات install/postinstall افتراضياً ويفشل التثبيت بـ
+# ERR_PNPM_IGNORED_BUILDS حتى تُقَرّ كل حزمة صراحةً هنا.
+#
+# كانت better-sqlite3-multiple-ciphers غائبة عن القائمة — وهي المستخدمة فعلياً
+# (تحمل تشفير SQLCipher لقاعدة الأوفلاين)، لا النسخة العادية المذكورة. فكان
+# `pnpm install --frozen-lockfile` يفشل على كل دفعة، وبقي CI أحمر بلا انتباه.
+#
+# كل اسم هنا يُشغِّل شيفرة أثناء التثبيت — قائمة مقصودة لا تُوسَّع بلا سبب.
 allowBuilds:
-  better-sqlite3: true
-  '@prisma/client': true
-  '@prisma/engines': true
+  "@prisma/client": true
+  "@prisma/engines": true
   bcrypt: true
+  # better-sqlite3 العادية مُستخدَمة كنوع فقط: `import type` في base.ts وإعلان
+  # الوحدة في types/. المخرج المُترجَم لا يحمّلها إطلاقاً (صفر require)، فبناء
+  # ملحقها الأصلي عملٌ بلا مستفيد — ويفشل على إصدارات Node التي لا يوجد لها
+  # ملحق جاهز، فيمنع كل أمر pnpm محلّياً.
+  better-sqlite3: false
+  better-sqlite3-multiple-ciphers: true # الملحق الأصلي لقاعدة الأوفلاين المشفّرة
   electron: true
   esbuild: true
   prisma: true

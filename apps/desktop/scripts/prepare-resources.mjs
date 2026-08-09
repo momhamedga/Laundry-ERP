@@ -338,8 +338,24 @@ rmSync(resources, { recursive: true, force: true });
 mkdirSync(path.join(resources, "api"), { recursive: true });
 mkdirSync(path.join(resources, "renderer"), { recursive: true });
 
+/**
+ * خرائط المصدر تُستبعَد من المشحون.
+ *
+ * `sourceMap: true` في tsconfig مقصود للتطوير والتنقيح المحلّي، لكن نسخ
+ * `dist` كان يأخذها كما هي فتصل 295 خريطة إلى جهاز العميل — وهي كافية
+ * لإعادة بناء شيفرة الخادم الأصلية كاملة من مجلّد التثبيت. لا يقرؤها Node
+ * وقت التشغيل إطلاقاً (المنقّح وحده يفعل)، فاستبعادها لا يغيّر أي سلوك.
+ *
+ * نستبعد عند النسخ لا بالحذف بعده: `apps/api/dist` يبقى كما هو فلا يتأثّر
+ * التنقيح المحلّي ولا `pnpm --filter @laundry/api build`.
+ */
+const isSourceMap = (src) => /\.(js|cjs|mjs|css)\.map$/i.test(src);
+
 // ==================== API ====================
-cpSync(apiDist, path.join(resources, "api", "dist"), { recursive: true });
+cpSync(apiDist, path.join(resources, "api", "dist"), {
+  recursive: true,
+  filter: (src) => !isSourceMap(src),
+});
 cpSync(apiPkg, path.join(resources, "api", "package.json"));
 /**
  * نسخ prisma بلا سكربتات البذر.
@@ -369,7 +385,7 @@ const rendererDest = path.join(resources, "renderer");
 // (1) ملفّات التطبيق (server.js/.next/…) متجاهلاً كل node_modules الرمزية
 cpSync(standalone, rendererDest, {
   recursive: true,
-  filter: (src) => !src.split(path.sep).includes("node_modules"),
+  filter: (src) => !src.split(path.sep).includes("node_modules") && !isSourceMap(src),
 });
 // (2) node_modules مسطّح من .pnpm الخاص بالـ standalone
 const nRen = flattenPnpm(path.join(standalone, "node_modules"), path.join(rendererDest, "node_modules"));
@@ -478,7 +494,37 @@ function assertParsable(root) {
   console.log(`• فحص قابلية التحليل: ${targets.length} ملفّاً حرجاً — سليمة`);
 }
 
+/**
+ * يرفض شحن خرائط المصدر.
+ *
+ * الفلاتر أعلاه تغطّي المسارات المعروفة، لكن أي مسار نسخ جديد يُضاف لاحقاً
+ * سيمرّرها بصمت — وهو ما حدث فعلاً: 331 خريطة وصلت الحزمة دون اعتراض،
+ * تكفي لإعادة بناء شيفرة الخادم كاملة من مجلّد التثبيت.
+ */
+function assertNoSourceMaps(root) {
+  const found = [];
+  const walk = (dir) => {
+    if (found.length > 12) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(js|cjs|mjs|css)\.map$/i.test(e.name)) found.push(path.relative(root, p));
+    }
+  };
+  walk(root);
+
+  if (found.length > 0) {
+    console.error(`\n✗ ${found.length} خريطة مصدر داخل ما سيُشحن — أُوقف التغليف:\n`);
+    for (const f of found.slice(0, 8)) console.error(`    ${f}`);
+    if (found.length > 8) console.error(`    … و${found.length - 8} غيرها`);
+    console.error("");
+    process.exit(1);
+  }
+  console.log("• فحص خرائط المصدر: صفر");
+}
+
 assertNoSecrets(resources);
+assertNoSourceMaps(resources);
 assertParsable(resources);
 
 console.log("✓ resources/ جاهزة (api + renderer) بـ node_modules مسطّح بلا روابط.");

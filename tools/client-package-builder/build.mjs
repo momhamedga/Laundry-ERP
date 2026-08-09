@@ -85,6 +85,10 @@ function validate(cfg) {
   if (!/^postgres(ql)?:\/\/.+/i.test(cfg.databaseUrl)) {
     errors.push("رابط قاعدة البيانات يجب أن يبدأ بـ postgresql://");
   }
+  // عزل العملاء يُفرَض هنا وحده؛ لا حاجز برمجي بعد هذه النقطة
+  if (!process.argv.includes("--allow-shared-db")) {
+    assertUnusedDatabase(cfg);
+  }
   if (!fs.existsSync(cfg.activationRequest)) {
     errors.push(`ملفّ طلب التفعيل غير موجود: ${cfg.activationRequest}`);
   }
@@ -134,6 +138,49 @@ function issueLicense(cfg) {
   return { license, text: sdk.encodeLicenseFile(license), machineId: req.machineId };
 }
 
+/**
+ * بصمة رابط قاعدة البيانات — تُخزَّن بدل الرابط نفسه.
+ *
+ * نحتاج التعرّف على تكرار القاعدة بين عميلين، ولا نريد سجلّاً يحمل روابط
+ * اتصال حيّة بكلمات سرّها: السجلّ يُنسخ احتياطياً ويُفتح ويُشارَك، وتسريبه
+ * حينها يعني تسريب كل قواعد عملائك دفعةً واحدة. التجزئة تكفي للمقارنة
+ * ولا يمكن عكسها.
+ */
+function databaseFingerprint(url) {
+  return crypto.createHash("sha256").update(url.trim()).digest("hex").slice(0, 24);
+}
+
+/**
+ * يمنع توجيه عميلين إلى القاعدة نفسها.
+ *
+ * العزل في هذا المنتج قاعدةٌ لكل عميل، ويُفرَض هنا وحده — لا يوجد أي حاجز
+ * برمجي لاحق. وكان يعتمد على انتباه المشغّل بالكامل: لصق رابط سابق بالخطأ
+ * يجعل عميلين يقرآن ويكتبان في البيانات نفسها، ولا شيء يعترض. هذا الفحص
+ * يوقف البناء عند التكرار.
+ */
+function assertUnusedDatabase(cfg) {
+  const fp = databaseFingerprint(cfg.databaseUrl);
+  let reg;
+  try {
+    reg = JSON.parse(fs.readFileSync(path.join(LM_DATA, "registry.json"), "utf8"));
+  } catch {
+    return fp; // سجلّ جديد — لا شيء لمقارنته
+  }
+
+  const clash = (reg.licenses ?? []).find((l) => l.databaseFingerprint === fp);
+  if (clash) {
+    console.error("\n✗ قاعدة البيانات هذه مُستخدَمة بالفعل — أُوقف البناء:\n");
+    console.error(`    العميل الحالي : ${cfg.laundryName}`);
+    console.error(`    مُسجَّلة لـ    : ${clash.customerName} (${clash.companyName ?? "—"})`);
+    console.error(`    تاريخ الإصدار : ${clash.issueDate ?? "—"}`);
+    console.error("\n  المتابعة تعني أن العميلين سيقرآن ويكتبان في البيانات نفسها.");
+    console.error("  أنشئ قاعدة منفصلة لهذا العميل، أو مرّر --allow-shared-db");
+    console.error("  إن كان هذا الجهاز فرعاً إضافياً للعميل نفسه عمداً.\n");
+    process.exit(1);
+  }
+  return fp;
+}
+
 /** يسجّل الترخيص في سجلّ مدير التراخيص كي يبقى مصدر حقيقة واحداً. */
 function recordInRegistry(cfg, payload, fileName) {
   const regFile = path.join(LM_DATA, "registry.json");
@@ -150,6 +197,8 @@ function recordInRegistry(cfg, payload, fileName) {
     maxUsers: payload.maxUsers,
     maxDevices: payload.maxDevices,
     maxBranches: payload.maxBranches,
+    /** تجزئة لا الرابط نفسه — تكفي لكشف التكرار ولا تُسرّب بيانات اتصال */
+    databaseFingerprint: databaseFingerprint(cfg.databaseUrl),
     status: "active",
     fileName,
     notes: `حزمة عميل — ${cfg.laundryName}${cfg.phone ? ` — ${cfg.phone}` : ""}`,

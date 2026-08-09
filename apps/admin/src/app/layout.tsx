@@ -22,6 +22,19 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description: "نظام إدارة المغاسل الاحترافي - لوحة التحكم",
+  /**
+   * لوحة إدارة خاصّة — تُمنع فهرستها.
+   *
+   * لا يوجد ما تكسبه من ظهورها في نتائج البحث، وفي ظهورها ضرر: صفحة دخول
+   * تحمل اسم المنشأة تُصبح هدفاً معروفاً لمحاولات التخمين. كانت غائبة تماماً،
+   * فأي نشر على نطاق عام يُفهرَس افتراضاً.
+   */
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false },
+  },
 };
 
 export default function RootLayout({

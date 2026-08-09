@@ -20,7 +20,7 @@
     "package:client": "node tools/build-client-package.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "packageManager": "pnpm@11.12.0"
 }

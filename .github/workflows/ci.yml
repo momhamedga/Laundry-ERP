@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +58,7 @@ jobs:
         run: pnpm --filter @laundry/api build
 
       - name: Upload API coverage
-        if: matrix.node == 20
+        if: matrix.node == 22
         uses: actions/upload-artifact@v4
         with:
           name: api-coverage
@@ -99,10 +99,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install (frozen lockfile)
@@ -132,7 +132,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -164,7 +164,7 @@ jobs:
         run: pnpm --filter @laundry/admin build
 
       - name: Upload Admin coverage
-        if: matrix.node == 20
+        if: matrix.node == 22
         uses: actions/upload-artifact@v4
         with:
           name: admin-coverage

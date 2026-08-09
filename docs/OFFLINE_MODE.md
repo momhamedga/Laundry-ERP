@@ -1,17 +1,37 @@
 # Offline Mode
 
-The desktop app is **offline-first**: it keeps working with no internet and syncs
-automatically when the connection returns.
+The **order-taking path** keeps working with no internet and syncs automatically
+when the connection returns. Most other screens need the cloud database and say
+so plainly when it is unreachable.
+
+This is deliberate: a laundry must never stop taking orders because the internet
+dropped, but reports and administration can wait until it is back.
 
 ## What works offline
 
-| Entity | Offline create / edit | Notes |
+| Area | Offline | Notes |
 |---|---|---|
-| Customers | ✅ create, update | captured to the sync queue |
-| Orders (+ items) | ✅ create | totals computed locally |
-| Payments | ✅ record | updates the order's paid amount / status |
-| Read caches | ✅ read | services, categories, users, permissions, inventory, branches, populated from the server while online |
-| Employees / server settings | ❌ | **not** available offline (admin/config entities; edit while online) |
+| **Licence activation / validation** | ✅ | fully local (RSA); never needs a network at any point |
+| **Customer lookup** | ✅ | reads the local table, seeded from the server while online |
+| **Service catalogue + prices** | ✅ | read cache, refreshed on login and on reconnect |
+| **Branches** | ✅ | read cache |
+| **Create order (+ items, totals)** | ✅ | written locally, queued, and uploaded on reconnect |
+| **Record payment** | ✅ | queued as `PENDING`; the server confirms it on sync |
+| **Create / edit customer** | ✅ | queued |
+| **Login** | ❌ | needs the cloud database. An **already-signed-in** session keeps working; if the app is closed while offline, signing in again is not possible |
+| Orders list / order details | ❌ | database required |
+| Dashboard, reports, invoices | ❌ | database required |
+| Users, settings, backup, HR, inventory | ❌ | database required |
+
+Verified on a real machine (v2.1.6): an order and a payment created with the
+network down, then uploaded automatically on reconnect — `processed=2 done=2`,
+with no duplicates and no lost data.
+
+### Offline order numbers
+
+An order created offline has **no order number** until it syncs. Numbering is
+central to the server; a locally invented number would collide with numbers
+issued to other devices. `id_map` links the local id to the server one.
 
 ## How it works
 
@@ -29,18 +49,26 @@ automatically when the connection returns.
 
 ## Network detection
 
-A background network monitor watches connectivity to the local API. On the
-`offline → online` transition the sync engine runs automatically (see
-[SYNC_ENGINE](SYNC_ENGINE.md)). Status is surfaced to the UI and the tray.
+A background monitor calls the local API's `/health` every five seconds. That
+endpoint runs `SELECT 1` against the cloud database, so what is measured is
+**"can we reach the database"** — not "is there Wi-Fi". A laptop attached to a
+router with no internet is correctly reported as offline.
+
+On the `offline → online` transition the sync engine runs automatically (see
+[SYNC_ENGINE](SYNC_ENGINE.md)), and the read caches refresh.
 
 ## Operator expectations
 
-- You can create customers, orders, and take payments with **no internet**.
-- A **sync indicator** shows pending items and sync status.
+- You can look up customers, create orders, and take payments with **no internet**.
 - When the connection returns, everything uploads automatically; you don't need to
   do anything.
+- A **desktop notification** appears when the connection is lost.
 - If an item **can't** sync (e.g. a server validation conflict), it moves to a
-  **dead-letter** list you can review, retry, or discard.
+  **dead-letter** list, reachable through the offline queue IPC channels.
+
+> **No in-app sync indicator yet.** The queue status is available over IPC
+> (`offline.queue.stats`) but no screen renders it, so pending items are visible
+> only in the log. Documented here rather than implied to exist.
 
 ## Limits & honest notes
 
