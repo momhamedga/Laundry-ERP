@@ -57,7 +57,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {serverError && (
         <div
           role="alert"
@@ -68,7 +68,7 @@ export function LoginForm() {
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <Label htmlFor="email">البريد الإلكتروني</Label>
         <Input
           id="email"
@@ -86,7 +86,7 @@ export function LoginForm() {
         )}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">كلمة السر</Label>
           <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-primary hover:underline">
@@ -104,11 +104,17 @@ export function LoginForm() {
             className="pe-10"
             {...register("password")}
           />
+          {/*
+            موضع فيزيائي (right) لا منطقي (end): الحقل نفسه dir="ltr" لأن كلمات
+            السرّ لاتينية، فالنصّ يبدأ من اليسار — بينما end في صفحة RTL يعني
+            اليسار أيضاً، فكان الزرّ يجلس فوق أوّل حرف. الحشو pe-10 يقابله على
+            اليمين داخل حقل LTR، فالجهتان متطابقتان الآن.
+          */}
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
             aria-label={showPassword ? "إخفاء كلمة السر" : "إظهار كلمة السر"}
-            className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
@@ -120,7 +126,7 @@ export function LoginForm() {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pt-0.5">
         <Checkbox
           id="remember"
           checked={rememberMe}
@@ -131,7 +137,7 @@ export function LoginForm() {
         </Label>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? <Spinner className="text-primary-foreground" /> : <LogIn aria-hidden />}
         تسجيل الدخول
       </Button>
