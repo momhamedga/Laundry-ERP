@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { SuccessState } from "@/components/ui/success-state";
 import { useChangePasswordMutation } from "@/hooks/use-profile";
-import { getErrorMessage } from "@/lib/axios";
+import { ERROR_CODES, getErrorCode, getErrorMessage } from "@/lib/axios";
 import {
   changePasswordFormSchema,
   toChangePasswordInput,
@@ -26,7 +26,6 @@ const EMPTY_VALUES: ChangePasswordFormValues = {
   confirmPassword: "",
 };
 
-const WRONG_CURRENT_PASSWORD_MESSAGE = "Current password is incorrect";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -67,9 +66,8 @@ export function ChangePasswordForm() {
       setVisibility({ current: false, next: false, confirm: false });
       setSucceeded(true);
     } catch (error) {
-      const message = getErrorMessage(error);
-      setServerError(message);
-      if (message === WRONG_CURRENT_PASSWORD_MESSAGE) {
+      setServerError(getErrorMessage(error));
+      if (getErrorCode(error) === ERROR_CODES.WRONG_CURRENT_PASSWORD) {
         setError("currentPassword", { message: "كلمة السر الحالية غير صحيحة" });
       }
       // toast الخطأ العام يظهر بالفعل عبر onError الخاص بالـ mutation

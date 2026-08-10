@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { SuccessState } from "@/components/ui/success-state";
 import { useResetPasswordMutation } from "@/hooks/use-password-reset";
-import { getErrorMessage } from "@/lib/axios";
+import { ERROR_CODES, getErrorCode, getErrorMessage } from "@/lib/axios";
 import {
   resetPasswordFormSchema,
   toResetPasswordInput,
@@ -22,7 +22,6 @@ import {
 } from "@/lib/validations/reset-password";
 import { ResetPasswordErrorState } from "./reset-password-error-state";
 
-const INVALID_TOKEN_MESSAGE = "Invalid or expired reset token";
 
 interface ResetPasswordFormProps {
   token: string;
@@ -54,11 +53,10 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       await mutation.mutateAsync(toResetPasswordInput(token, values));
       setSucceeded(true);
     } catch (error) {
-      const message = getErrorMessage(error);
-      if (message === INVALID_TOKEN_MESSAGE) {
+      if (getErrorCode(error) === ERROR_CODES.INVALID_RESET_TOKEN) {
         setTokenInvalid(true);
       } else {
-        setServerError(message);
+        setServerError(getErrorMessage(error));
       }
     }
   }

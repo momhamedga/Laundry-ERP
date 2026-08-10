@@ -85,7 +85,10 @@ function looksLikeConnectivityFailure(err: unknown): boolean {
   if (e.response.status === 503) return true;
   if (e.response.status !== 500) return false;
 
-  const body = e.response.data as { message?: string } | undefined;
+  // الرمز أولاً: عقدٌ مستقرّ لا يتأثّر بصياغة الرسالة. مطابقة النصّ تبقى
+  // احتياطاً لخادم أقدم لا يرسل الرمز بعد (نسخة مدمجة لم تُحدَّث).
+  const body = e.response.data as { message?: string; code?: string } | undefined;
+  if (body?.code === "DB_UNREACHABLE") return true;
   return typeof body?.message === "string" && body.message.includes("قاعدة البيانات");
 }
 

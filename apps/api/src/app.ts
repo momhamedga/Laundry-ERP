@@ -4,6 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
+import { configureZodArabic } from "./config/zod-locale.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 import { buildAdminModule } from "./modules/admin/index.js";
 import { buildAuthModule } from "./modules/auth/index.js";
@@ -33,6 +34,9 @@ import { buildUsersModule } from "./modules/users/index.js";
 import { healthRouter } from "./routes/health.route.js";
 
 export function createApp(): express.Express {
+  // قبل أي مسار: رسائل تحقّق Zod تُولَّد وقت الطلب، فيكفي ضبطها هنا مرّة واحدة
+  configureZodArabic();
+
   const app = express();
 
   // خلف Reverse Proxy في الإنتاج - يلزم لصحة req.ip مع Rate Limiting

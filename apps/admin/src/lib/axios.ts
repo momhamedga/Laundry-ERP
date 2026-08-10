@@ -95,7 +95,29 @@ apiClient.interceptors.response.use(
 interface ApiErrorBody {
   success: false;
   message: string;
+  /** رمز ثابت للحالات التي تتفرّع عندها الواجهة سلوكياً - راجع getErrorCode */
+  code?: string;
   errors?: { path: string; message: string }[];
+}
+
+/** رموز الأخطاء التي تتفرّع عندها الواجهة — مرآة constants/error-codes.ts بالخادم */
+export const ERROR_CODES = {
+  INVALID_RESET_TOKEN: "INVALID_RESET_TOKEN",
+  WRONG_CURRENT_PASSWORD: "WRONG_CURRENT_PASSWORD",
+} as const;
+
+/**
+ * رمز الخطأ إن أرسله الخادم.
+ *
+ * كانت الواجهة تطابق على نصّ الرسالة الإنجليزي حرفياً، فأسقط تعريبُ رسائل
+ * الخادم تلك الفروع بصمت — لا خطأ ترجمة ولا اختبار يسقط، فقط سلوك يختفي.
+ * الرمز لا يتأثّر بأي تحسين صياغة لاحق.
+ */
+export function getErrorCode(error: unknown): string | undefined {
+  if (error instanceof AxiosError) {
+    return (error.response?.data as ApiErrorBody | undefined)?.code;
+  }
+  return undefined;
 }
 
 /** هل الفشل بسبب تعذّر الوصول للخادم أصلاً (لا استجابة)؟ */

@@ -1,14 +1,23 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { env } from "../config/env.js";
+import { ERROR_CODES } from "../constants/error-codes.js";
 
 /**
  * خطأ تشغيلي معروف يمكن إظهار رسالته للعميل بأمان
  */
 export class ApiError extends Error {
+  /**
+   * @param code رمز ثابت للحالات التي تتفرّع عندها الواجهة سلوكياً لا عرضياً.
+   *
+   * كانت الواجهة تطابق على نصّ الرسالة الإنجليزي حرفياً (شاشة «رابط منتهٍ»،
+   * تلوين حقل كلمة السر الحالية)، فأسقطها تعريب الرسائل بصمت: لا خطأ ترجمة
+   * ولا اختبار يسقط، فقط سلوك يختفي. الرمز عقدٌ مستقرّ لا يتأثّر بالصياغة.
+   */
   constructor(
     public readonly statusCode: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -31,7 +40,11 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (err instanceof ApiError) {
-    res.status(err.statusCode).json({ success: false, message: err.message });
+    res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      ...(err.code ? { code: err.code } : {}),
+    });
     return;
   }
 
@@ -73,7 +86,8 @@ export function errorHandler(
   // انقطاع الاتصال بقاعدة البيانات ليس خطأً برمجياً، ورسالة «Internal server error»
   // تترك المستخدم بلا أي دليل على السبب أو الحل. نبقي على 500 حفاظاً على العقد
   // ونستبدل الرسالة بنصّ عربي يشرح السبب الفعلي وما يفعله المستخدم.
-  const message = isDatabaseUnreachable(err)
+  const dbDown = isDatabaseUnreachable(err);
+  const message = dbDown
     ? "تعذّر الاتصال بقاعدة البيانات. تحقّق من اتصال الإنترنت ثم أعد المحاولة."
     : env.isProduction
       ? "حدث خطأ غير متوقّع في النظام. أعد المحاولة، وإن تكرّر راجع الدعم الفني."
@@ -81,7 +95,11 @@ export function errorHandler(
         ? err.message
         : "خطأ غير معروف";
 
-  res.status(500).json({ success: false, message });
+  res.status(500).json({
+    success: false,
+    message,
+    ...(dbDown ? { code: ERROR_CODES.DB_UNREACHABLE } : {}),
+  });
 }
 
 /**

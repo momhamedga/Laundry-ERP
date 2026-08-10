@@ -1,5 +1,6 @@
 import type { User } from "@prisma/client";
 import { env } from "../../config/env.js";
+import { ERROR_CODES } from "../../constants/error-codes.js";
 import {
   comparePassword,
   DUMMY_PASSWORD_HASH,
@@ -242,7 +243,11 @@ export class AuthService {
 
     const valid = await comparePassword(dto.currentPassword, user.passwordHash);
     if (!valid) {
-      throw new ApiError(400, "كلمة السر الحالية غير صحيحة.");
+      throw new ApiError(
+        400,
+        "كلمة السر الحالية غير صحيحة.",
+        ERROR_CODES.WRONG_CURRENT_PASSWORD,
+      );
     }
 
     await this.repo.updatePassword(userId, await hashPassword(dto.newPassword));
@@ -300,7 +305,11 @@ export class AuthService {
       !user.resetTokenExpiresAt ||
       user.resetTokenExpiresAt.getTime() <= Date.now()
     ) {
-      throw new ApiError(400, "رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.");
+      throw new ApiError(
+        400,
+        "رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.",
+        ERROR_CODES.INVALID_RESET_TOKEN,
+      );
     }
 
     await this.repo.updatePassword(user.id, await hashPassword(dto.newPassword));
