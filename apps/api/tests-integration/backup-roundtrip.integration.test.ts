@@ -101,7 +101,7 @@ describe("backup round-trip (integration)", () => {
       .post("/api/v1/backup/restore")
       .set(bearer(adminToken))
       .set("x-restore-confirm", "true") // حارس مقصود: الاستعادة لا تُنفَّذ بلا تأكيد صريح
-      .set("Content-Type", "application/json")
+      .set("Content-Type", "application/octet-stream")
       .send(file);
 
     expect(restored.status).toBe(200);
@@ -144,7 +144,7 @@ describe("backup round-trip (integration)", () => {
       .post("/api/v1/backup/restore")
       .set(bearer(adminToken))
       .set("x-restore-confirm", "true")
-      .set("Content-Type", "application/json")
+      .set("Content-Type", "application/octet-stream")
       .send(Buffer.from(JSON.stringify(legacy), "utf-8"));
 
     expect(res.status).toBe(200);
@@ -158,7 +158,7 @@ describe("backup round-trip (integration)", () => {
     const res = await api(app)
       .post("/api/v1/backup/restore")
       .set(bearer(adminToken))
-      .set("Content-Type", "application/json")
+      .set("Content-Type", "application/octet-stream")
       .send(Buffer.from(exported.text, "utf-8"));
 
     expect(res.status).toBe(400);
