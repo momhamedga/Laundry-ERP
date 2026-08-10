@@ -1,23 +1,35 @@
 import type { BackupProvider } from "@prisma/client";
-import { env } from "../../config/env.js";
+import { B2Client, readB2Config } from "./backup.b2.js";
 
 /**
- * مزوّد تخزين النسخ (Strategy Pattern) - نفس نمط ChannelRegistry للإشعارات حرفياً.
- * LOCAL حقيقي؛ S3/R2/BACKBLAZE مزوّدات Scaffold (configured=false بلا تكامل SDK،
- * تماماً كـSMS/WhatsApp/Push). configured=false يعني: الخدمة تتراجع إلى LOCAL بلا
- * إسقاط الخادم. credentialsDetected يكشف وجود أسرار بالبيئة للعرض بالواجهة.
+ * مزوّدو تخزين النسخ (Strategy Pattern).
+ *
+ * كان هنا ثلاثة مزوّدين سحابيين (S3 وR2 وBackblaze) كلّهم هياكل فارغة:
+ * configured=false دائماً، وpersist() ترمي «SDK integration pending»، ولا
+ * مستدعٍ لها أصلاً. أي أن اختيار مزوّد سحابي من الإعدادات كان يتراجع إلى
+ * LOCAL بصمت — يرى المستخدم اسم مزوّده في القائمة ويظنّ نسخه في السحابة.
+ *
+ * الآن مزوّدان اثنان فقط، وكلاهما حقيقي: LOCAL وB2. حُذف S3 وR2 لأن وجود خيار
+ * لا يعمل أسوأ من غيابه. (قيمتاهما باقيتان في enum قاعدة البيانات ولا تظهران
+ * في أي واجهة — إزالتهما تستلزم ترحيلاً على الإنتاج مقابل مكسب شكلي.)
  */
 export interface BackupStorageProvider {
   readonly provider: BackupProvider;
-  /** جاهز للاستخدام فعلياً (LOCAL دائماً true؛ السحابة false حتى يُدمَج SDK) */
+  /** جاهز للاستخدام فعلياً */
   readonly configured: boolean;
-  /** رُصدت أسرار بالبيئة (لعرض "بانتظار التكامل" بالواجهة) - لا يعني configured */
+  /** رُصدت أسرار بالبيئة — للتمييز بين «غير مُعَدّ» و«مُعَدّ لكنه يفشل» */
   readonly credentialsDetected: boolean;
-  /** يثبّت ملفاً مكتوباً محلياً ويعيد المسار/المفتاح النهائي - لا يُستدعى إن كان configured=false */
-  persist(localFilePath: string): Promise<string>;
+  /** يرفع الملف المكتوب محلياً ويعيد اسمه البعيد؛ LOCAL يعيد المسار كما هو */
+  persist(localFilePath: string, remoteName: string): Promise<string>;
+  /** يجلب الملف من التخزين البعيد؛ LOCAL يرمي (يُقرأ من القرص مباشرةً) */
+  fetch(remoteName: string): Promise<Buffer>;
+  /** يحذف الملف من التخزين البعيد؛ LOCAL لا شيء (يُحذف من القرص) */
+  remove(remoteName: string): Promise<void>;
+  /** فحص اتصال حقيقي — لا مجرّد «هل الأسرار موجودة» */
+  probe(): Promise<void>;
 }
 
-/** التخزين المحلي - الملف مكتوب أصلاً بمجلد النسخ، لا خطوة إضافية */
+/** التخزين المحلي — الملف مكتوب أصلاً بمجلد النسخ، لا خطوة إضافية */
 class LocalStorageProvider implements BackupStorageProvider {
   readonly provider = "LOCAL" as const;
   readonly configured = true;
@@ -26,62 +38,86 @@ class LocalStorageProvider implements BackupStorageProvider {
   persist(localFilePath: string): Promise<string> {
     return Promise.resolve(localFilePath);
   }
+  fetch(): Promise<Buffer> {
+    return Promise.reject(new Error("التخزين المحلي يُقرأ من القرص مباشرةً"));
+  }
+  remove(): Promise<void> {
+    return Promise.resolve();
+  }
+  probe(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
-/**
- * مزوّد سحابي متوافق مع S3 (يخدم S3/R2/Backblaze بنفس البروتوكول). Scaffold:
- * configured=false دائماً حالياً (لا SDK مُدمَج) - credentialsDetected يعكس البيئة.
- * persist() يرمي بوضوح إن استُدعي (الخدمة تحرسه بفحص configured أولاً).
- */
-class S3CompatibleStorageProvider implements BackupStorageProvider {
-  readonly configured = false;
+/** Backblaze B2 — تكامل حقيقي عبر واجهة B2 الأصلية (راجع backup.b2.ts) */
+class B2StorageProvider implements BackupStorageProvider {
+  readonly provider = "BACKBLAZE" as const;
+  private readonly client: B2Client | null;
 
-  constructor(readonly provider: BackupProvider) {}
-
-  get credentialsDetected(): boolean {
-    return Boolean(
-      env.BACKUP_S3_BUCKET &&
-        env.BACKUP_S3_ACCESS_KEY_ID &&
-        env.BACKUP_S3_SECRET_ACCESS_KEY,
-    );
+  constructor() {
+    const config = readB2Config();
+    this.client = config ? new B2Client(config) : null;
   }
 
-  persist(): Promise<string> {
-    return Promise.reject(
-      new Error(`${this.provider} storage is a scaffold - SDK integration pending`),
-    );
+  get configured(): boolean {
+    return this.client !== null;
+  }
+  get credentialsDetected(): boolean {
+    return this.client !== null;
+  }
+
+  private require(): B2Client {
+    if (!this.client) throw new Error("تخزين Backblaze غير مُعَدّ (متغيّرات BACKUP_B2_* ناقصة)");
+    return this.client;
+  }
+
+  persist(localFilePath: string, remoteName: string): Promise<string> {
+    return this.require().uploadFile(localFilePath, remoteName);
+  }
+  fetch(remoteName: string): Promise<Buffer> {
+    return this.require().downloadFile(remoteName);
+  }
+  remove(remoteName: string): Promise<void> {
+    return this.require().deleteFile(remoteName);
+  }
+  probe(): Promise<void> {
+    return this.require().probe();
   }
 }
 
 export class BackupStorageRegistry {
-  private readonly providers: Record<BackupProvider, BackupStorageProvider>;
+  private readonly local = new LocalStorageProvider();
+  private readonly b2 = new B2StorageProvider();
 
-  constructor() {
-    this.providers = {
-      LOCAL: new LocalStorageProvider(),
-      S3: new S3CompatibleStorageProvider("S3"),
-      R2: new S3CompatibleStorageProvider("R2"),
-      BACKBLAZE: new S3CompatibleStorageProvider("BACKBLAZE"),
-    };
-  }
-
+  /**
+   * S3 وR2 لم يعودا مدعومين؛ سجلٌّ قديم يحمل إحداهما (لا يوجد أيٌّ منها فعلياً)
+   * يُعامَل كمحلّي بدل أن يُسقط الطلب.
+   */
   get(provider: BackupProvider): BackupStorageProvider {
-    return this.providers[provider];
+    return provider === "BACKBLAZE" ? this.b2 : this.local;
   }
 
-  /** حالة كل المزوّدات - لـ/backup/health وشاشة الإعدادات */
+  /** حالة المزوّدين — لـ/backup/health وشاشة الإعدادات */
   statusList(): {
     provider: BackupProvider;
     configured: boolean;
     credentialsDetected: boolean;
   }[] {
-    return (Object.keys(this.providers) as BackupProvider[]).map((key) => {
-      const p = this.providers[key];
-      return {
-        provider: p.provider,
-        configured: p.configured,
-        credentialsDetected: p.credentialsDetected,
-      };
-    });
+    return [this.local, this.b2].map((p) => ({
+      provider: p.provider,
+      configured: p.configured,
+      credentialsDetected: p.credentialsDetected,
+    }));
+  }
+
+  /** فحص اتصال حقيقي بالمزوّد السحابي — يعيد رسالة الخطأ إن فشل */
+  async probeCloud(): Promise<{ configured: boolean; ok: boolean; error: string | null }> {
+    if (!this.b2.configured) return { configured: false, ok: false, error: null };
+    try {
+      await this.b2.probe();
+      return { configured: true, ok: true, error: null };
+    } catch (err) {
+      return { configured: true, ok: false, error: err instanceof Error ? err.message : "خطأ غير معروف" };
+    }
   }
 }

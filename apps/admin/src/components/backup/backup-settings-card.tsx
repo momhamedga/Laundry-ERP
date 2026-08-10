@@ -95,15 +95,16 @@ export function BackupSettingsCard() {
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
+                {/* S3 وR2 حُذفا: كانا خيارين بلا تنفيذ، فاختيارهما يترك النسخ على
+                    قرص الخادم وحده بينما تعرض اللوحة اسم مزوّد سحابي. */}
                 <SelectContent>
-                  <SelectItem value="LOCAL">محلي (Local)</SelectItem>
-                  <SelectItem value="S3">Amazon S3</SelectItem>
-                  <SelectItem value="R2">Cloudflare R2</SelectItem>
-                  <SelectItem value="BACKBLAZE">Backblaze</SelectItem>
+                  <SelectItem value="LOCAL">قرص الخادم فقط</SelectItem>
+                  <SelectItem value="BACKBLAZE">Backblaze B2 (سحابي + قرص الخادم)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                المزوّدات السحابية Scaffold - تتراجع تلقائياً للتخزين المحلي بلا credentials
+                الخيار السحابي يحفظ نسخة على الخادم وأخرى في Backblaze. يتطلّب ضبط مفاتيح
+                B2 على الخادم، وإلا يتراجع للتخزين المحلي وتُبيّن لوحة الصحّة السبب.
               </p>
             </div>
             <div className="space-y-3">

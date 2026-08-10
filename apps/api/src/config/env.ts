@@ -21,18 +21,20 @@ const envSchema = z.object({
   /**
    * ==================== Backup (Phase 6) ====================
    * BACKUP_DIR اختياري - غيابه يعني مجلد افتراضي داخل apps/api (storage/backups)
-   * يُنشأ تلقائياً. باقي المتغيّرات أسرار السحابة (Scaffold): وجودها يجعل المزوّد
-   * configured=true؛ غيابها configured=false بلا إسقاط الخادم (نفس نمط RESEND_API_KEY).
+   * يُنشأ تلقائياً.
    */
   BACKUP_DIR: z.string().optional(),
   /** مفتاح تشفير AES-256 (32 بايت hex/utf8) - غيابه يُعطّل التشفير فعلياً حتى لو فُعِّل بالإعدادات */
   BACKUP_ENCRYPTION_KEY: z.string().optional(),
-  // Cloud (Scaffold) - S3 وR2 وBackblaze كلها متوافقة مع S3
-  BACKUP_S3_BUCKET: z.string().optional(),
-  BACKUP_S3_REGION: z.string().optional(),
-  BACKUP_S3_ACCESS_KEY_ID: z.string().optional(),
-  BACKUP_S3_SECRET_ACCESS_KEY: z.string().optional(),
-  BACKUP_S3_ENDPOINT: z.string().optional(),
+  /**
+   * Backblaze B2 — التخزين السحابي المدعوم. وجود الثلاثة معاً يجعل المزوّد
+   * configured=true؛ نقصان أيٍّ منها يُبقيه معطَّلاً بلا إسقاط الخادم (نفس نمط
+   * RESEND_API_KEY). أسماء صريحة لا BACKUP_S3_* لأن التنفيذ يستخدم واجهة B2
+   * الأصلية لا بروتوكول S3، فاسمٌ يوحي بغير ذلك يضلّل من يقرأ الإعدادات لاحقاً.
+   */
+  BACKUP_B2_KEY_ID: z.string().optional(),
+  BACKUP_B2_APP_KEY: z.string().optional(),
+  BACKUP_B2_BUCKET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -147,9 +147,33 @@ export class BackupService {
         stat(filePath),
       ]);
 
+      /**
+       * الرفع بعد اكتمال الكتابة والبصمة: نرفع ملفاً تامّاً مُتحقَّقاً منه لا
+       * تدفّقاً قد ينقطع. والملف يبقى محلياً أيضاً — السحابة نسخة ثانية لا بديل.
+       *
+       * فشل الرفع لا يُفشِل النسخة: الملف على القرص سليم وبصمته مُتحقَّقة، ووسمه
+       * FAILED كذبٌ يدفع المستخدم لإعادة عملٍ تمّ. يُسجَّل المزوّد الفعلي LOCAL
+       * ويُحفظ سبب الفشل في السجلّ ليظهر في اللوحة — لا يُبتلع ولا يُبالَغ فيه.
+       */
+      let storedProvider: BackupProvider = actualProvider;
+      let cloudError: string | null = null;
+      if (actualProvider !== "LOCAL") {
+        try {
+          await storageProvider.persist(filePath, record.filename);
+        } catch (err) {
+          console.error("💥 فشل رفع النسخة إلى التخزين السحابي:", err);
+          storedProvider = "LOCAL";
+          cloudError = `النسخة سليمة محلياً، لكن تعذّر رفعها إلى التخزين السحابي: ${
+            err instanceof Error ? err.message : "خطأ غير معروف"
+          }`;
+        }
+      }
+
       const durationMs = Date.now() - start;
       const updated = await this.repo.updateRecord(record.id, {
         status: "COMPLETED",
+        provider: storedProvider,
+        error: cloudError,
         storagePath: filePath,
         sizeBytes: fileStat.size,
         checksum,
@@ -202,11 +226,39 @@ export class BackupService {
     if (!record || !record.storagePath) {
       throw new BackupNotFoundError("ملف النسخة الاحتياطية غير موجود.");
     }
-    try {
-      await access(record.storagePath, constants.R_OK);
-    } catch {
-      throw new BackupNotFoundError("سجلّ النسخة موجود لكن ملفها غير موجود على القرص. غالباً حُذف مع إعادة تشغيل الخادم.");
+
+    const onDisk = await access(record.storagePath, constants.R_OK).then(
+      () => true,
+      () => false,
+    );
+
+    /**
+     * القرص أولاً ثم السحابة: القراءة المحلية أسرع وبلا تكلفة، والسحابة هي
+     * السبب الذي من أجله وُجدت — أن يبقى للنسخة مصدرٌ ثانٍ حين يختفي الأول.
+     * قبل هذا كان اختفاء الملف محلياً يعني ضياعه ولو كان في السحابة.
+     */
+    if (!onDisk) {
+      if (record.provider === "LOCAL") {
+        throw new BackupNotFoundError(
+          "سجلّ النسخة موجود لكن ملفها غير موجود على القرص، ولا نسخة سحابية لها.",
+        );
+      }
+      const buffer = await this.storage
+        .get(record.provider)
+        .fetch(record.filename)
+        .catch((err: unknown) => {
+          console.error("💥 فشل جلب النسخة من التخزين السحابي:", err);
+          throw new BackupNotFoundError(
+            "الملف غير موجود على القرص وتعذّر جلبه من التخزين السحابي.",
+          );
+        });
+      return {
+        stream: Readable.from([buffer]) as unknown as ReadStream,
+        filename: record.filename,
+        size: buffer.byteLength,
+      };
     }
+
     const fileStat = await stat(record.storagePath);
     return {
       stream: createReadStream(record.storagePath),
@@ -219,7 +271,7 @@ export class BackupService {
     const record = await this.repo.findRecordById(id);
     if (!record) throw new BackupNotFoundError("النسخة الاحتياطية غير موجودة.");
 
-    await this.removeFileQuiet(record.storagePath);
+    await this.removeStoredFile(record);
     await this.repo.softDeleteRecord(id);
     await this.repo.createAuditLog({
       action: "BACKUP_DELETED",
@@ -238,7 +290,7 @@ export class BackupService {
       settings.keepLastN,
     );
     for (const record of candidates) {
-      await this.removeFileQuiet(record.storagePath);
+      await this.removeStoredFile(record);
       await this.repo.softDeleteRecord(record.id);
     }
     await this.repo.createAuditLog({
@@ -415,6 +467,37 @@ export class BackupService {
       checks.push({ key: "scheduleFailures", label: "فشل الجدولة", level: "CRITICAL", detail: `${settings.scheduleRetryCount} محاولات فاشلة متتالية` });
     }
 
+    /**
+     * التخزين السحابي — فحص اتصال فعلي لا مجرّد «هل المتغيّرات موجودة».
+     *
+     * مفتاح منتهٍ أو bucket محذوف أو صلاحية قراءة فقط: كلّها تُبقي المتغيّرات
+     * موجودة بينما لا يصل شيء إلى السحابة. اكتشاف ذلك يوم الحاجة متأخّر جداً،
+     * فيُفحص هنا مع كل عرض للوحة.
+     */
+    const cloud = await this.storage.probeCloud();
+    if (!cloud.configured) {
+      checks.push({
+        key: "cloud",
+        label: "التخزين السحابي",
+        level: "WARNING",
+        detail: "غير مُعَدّ — النسخ على قرص الخادم وحده",
+      });
+    } else if (cloud.ok) {
+      checks.push({
+        key: "cloud",
+        label: "التخزين السحابي",
+        level: "HEALTHY",
+        detail: `Backblaze B2 — متصل (${env.BACKUP_B2_BUCKET ?? ""})`,
+      });
+    } else {
+      checks.push({
+        key: "cloud",
+        label: "التخزين السحابي",
+        level: "CRITICAL",
+        detail: `مُعَدّ لكن الاتصال فاشل: ${cloud.error ?? "سبب غير معروف"}`,
+      });
+    }
+
     // التشفير (مُخزَّن لا يُطبَّق هذه المرحلة - شفافية)
     if (settings.encryptionEnabled) {
       checks.push({
@@ -550,12 +633,31 @@ export class BackupService {
     );
   }
 
-  private async removeFileQuiet(path: string | null): Promise<void> {
-    if (!path) return;
-    try {
-      await rm(path, { force: true });
-    } catch {
-      // ملف مفقود/غير قابل للحذف - لا يُفشِل الحذف المنطقي بقاعدة البيانات
+  /**
+   * يحذف الملف محلياً ومن السحابة معاً.
+   *
+   * حذف السجلّ بلا حذف النسخة السحابية يترك ملفات لا يعرف أحد بوجودها تستهلك
+   * مساحة وتُفوتَر إلى الأبد — وتحمل بيانات عملاء يُفترض أنها حُذفت.
+   */
+  private async removeStoredFile(record: {
+    storagePath: string | null;
+    filename: string;
+    provider: BackupProvider;
+  }): Promise<void> {
+    if (record.storagePath) {
+      try {
+        await rm(record.storagePath, { force: true });
+      } catch {
+        // ملف مفقود/غير قابل للحذف - لا يُفشِل الحذف المنطقي بقاعدة البيانات
+      }
+    }
+    if (record.provider !== "LOCAL") {
+      try {
+        await this.storage.get(record.provider).remove(record.filename);
+      } catch (err) {
+        // الحذف من السحابة أفضل جهد — يُسجَّل ولا يمنع حذف السجلّ
+        console.error("💥 تعذّر حذف النسخة من التخزين السحابي:", err);
+      }
     }
   }
 
