@@ -19,6 +19,7 @@ import { resolveBackupDir } from "./backup.constants.js";
 import type { BackupRepository } from "./backup.repository.js";
 import { reviveDates } from "./backup.repository.js";
 import { BackupStorageRegistry } from "./backup.storage.js";
+import { BACKUP_TABLES, SETTINGS_KEY } from "./backup.tables.js";
 import type {
   BackupCounts,
   BackupHealth,
@@ -512,21 +513,32 @@ export class BackupService {
     };
   }
 
+  /**
+   * أعداد كل جدول مشمول — مقادة بالسِجِلّ فتشمل أي جدول يُضاف تلقائياً.
+   * الجدول الغائب (ملف نسخة أقدم) يُعدّ صفراً لا يُسقِط المعاينة.
+   */
   private countsOf(data: Omit<BackupPayload, "metadata">): BackupCounts {
-    return {
-      branches: data.branches.length,
-      users: data.users.length,
-      customers: data.customers.length,
-      serviceCategories: data.serviceCategories.length,
-      services: data.services.length,
-      orders: data.orders.length,
-      orderItems: data.orderItems.length,
-      orderStatusHistory: data.orderStatusHistory.length,
-      payments: data.payments.length,
-      auditLogs: data.auditLogs.length,
-    };
+    const counts: BackupCounts = {};
+    const bag = data as unknown as Record<string, unknown>;
+
+    for (const table of BACKUP_TABLES) {
+      if (table.key === SETTINGS_KEY) {
+        counts[SETTINGS_KEY] = bag[SETTINGS_KEY] ? 1 : 0;
+        continue;
+      }
+      const rows = bag[table.key];
+      counts[table.key] = Array.isArray(rows) ? rows.length : 0;
+    }
+    return counts;
   }
 
+  /**
+   * فحص بنية الملف المرفوع.
+   *
+   * يُشترط وجود الجداول الأساسية القديمة فقط، لا كل جدول في السِجِلّ: ملفٌ
+   * أُنشئ قبل توسعة التغطية صالحٌ للاستعادة، ويُستعاد منه ما فيه ويُتخطّى ما
+   * ليس فيه. اشتراط الاكتمال كان سيرفض كل نسخة قديمة يملكها المستخدم.
+   */
   private isValidPayload(payload: BackupPayload | null): payload is BackupPayload {
     return Boolean(
       payload &&

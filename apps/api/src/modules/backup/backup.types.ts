@@ -26,9 +26,13 @@ export interface BackupMetadata {
 }
 
 /**
- * كل الجداول التشغيلية الحقيقية - بلا RefreshToken (أسرار جلسات صرفة)
- * وبلا حقول حساسة بالمستخدمين (SafeUser فقط - نفس تعقيم toSafeUser
- * المُستخدَم بكل استجابة API تحتوي مستخدمين)
+ * حمولة النسخة: كل جدول مشمول في BACKUP_TABLES مصفوفةٌ تحت مفتاحه، عدا
+ * settings (مفرد) وusers (SafeUser بلا أي حقل حسّاس — نفس تعقيم toSafeUser
+ * المُستخدَم في كل استجابة API تحتوي مستخدمين).
+ *
+ * الجداول العشرة القديمة مُصرَّح بأنواعها للحفاظ على أمان الأنواع في الشيفرة
+ * القائمة؛ الجداول المُضافة تُمرَّر كسجلّات عامة لأن الوحدة تنقلها كما هي بلا
+ * أي منطق يقرأ حقولها. مصدر الحقيقة لما يُشمَل هو BACKUP_TABLES لا هذا النوع.
  */
 export interface BackupPayload {
   metadata: BackupMetadata;
@@ -45,6 +49,16 @@ export interface BackupPayload {
   settings: SystemSettings | null;
 }
 
+/** سجلّ عام لأي صفّ داخل النسخة — المفتاح id مضمون في كل نماذج المخطّط */
+export type BackupRow = Record<string, unknown> & { id: string };
+
+/**
+ * عرض الحمولة كخريطة مفاتيح — للوصول للجداول المُضافة بعد الجداول العشرة
+ * المُصرَّح بأنواعها. فهرسٌ عام على BackupPayload نفسه كان سيُفقِد Omit
+ * الحقولَ المسمّاة (keyof على نوع بفهرس عام يصير string).
+ */
+export type BackupPayloadMap = Record<string, unknown>;
+
 // ==================== Phase 6 DTOs ====================
 
 export interface PaginationMeta extends Record<string, unknown> {
@@ -56,19 +70,11 @@ export interface PaginationMeta extends Record<string, unknown> {
   hasPrev: boolean;
 }
 
-/** لقطة أعداد الجداول - تُخزَّن بـBackupRecord.counts وتُعرض بالمعاينة (متوافقة مع Prisma JSON) */
-export interface BackupCounts extends Record<string, number> {
-  branches: number;
-  users: number;
-  customers: number;
-  serviceCategories: number;
-  services: number;
-  orders: number;
-  orderItems: number;
-  orderStatusHistory: number;
-  payments: number;
-  auditLogs: number;
-}
+/**
+ * لقطة أعداد الجداول - تُخزَّن بـBackupRecord.counts وتُعرض بالمعاينة.
+ * مفتاحٌ لكل جدول في BACKUP_TABLES، فتنمو تلقائياً مع أي جدول يُضاف.
+ */
+export type BackupCounts = Record<string, number>;
 
 export type BackupRecordDto = BackupRecord;
 

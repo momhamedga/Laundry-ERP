@@ -4,17 +4,27 @@ import type {
   BackupSettings,
   Prisma,
   PrismaClient,
+  User,
 } from "@prisma/client";
 import { toSafeUser } from "../auth/auth.utils.js";
+import { BACKUP_TABLES, SETTINGS_KEY, USERS_KEY } from "./backup.tables.js";
 import type { HistoryQuery } from "./backup.validator.js";
 import type {
   BackupCounts,
   BackupPayload,
+  BackupPayloadMap,
+  BackupRow,
   ListBackupHistoryResult,
   RestoreResult,
 } from "./backup.types.js";
 
 const SETTINGS_SINGLETON_ID = "singleton";
+
+/** الحد الأدنى من واجهة delegate الذي تستخدمه هذه الوحدة */
+interface PrismaDelegate {
+  findMany(args?: unknown): Promise<unknown[]>;
+  upsert(args: unknown): Promise<unknown>;
+}
 
 /** يحوّل سلاسل ISO-8601 لكائنات Date عند تحليل JSON المرفوع (Prisma يتوقّع Date للحقول الزمنية) */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -31,46 +41,51 @@ export function reviveDates(_key: string, value: unknown): unknown {
 export class BackupRepository {
   constructor(private readonly db: PrismaClient) {}
 
+  /**
+   * يجمع كل جدول مُدرَج في BACKUP_TABLES.
+   *
+   * القراءة بالتكرار على السِجِلّ لا بقائمة استعلامات مكتوبة يدوياً: القائمة
+   * اليدوية هي بالضبط ما تخلّف عن المخطّط حتى صارت النسخة تغطّي 10 جداول من 48.
+   * أي جدول يُضاف للسِجِلّ يُصدَّر ويُستعاد بلا لمس هذا الملف.
+   *
+   * الترتيب بـid تصاعدياً لا createdAt: ليس كل نموذج يحمل createdAt، وثبات
+   * الترتيب هو المطلوب هنا (بصمة الملف تتغيّر مع ترتيب مختلف لنفس البيانات).
+   */
   async collectAll(): Promise<Omit<BackupPayload, "metadata">> {
-    const [
-      branches,
-      usersRaw,
-      customers,
-      serviceCategories,
-      services,
-      orders,
-      orderItems,
-      orderStatusHistory,
-      payments,
-      auditLogs,
-      settings,
-    ] = await Promise.all([
-      this.db.branch.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.user.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.customer.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.serviceCategory.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.service.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.order.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.orderItem.findMany({ orderBy: { id: "asc" } }),
-      this.db.orderStatusHistory.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.payment.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.auditLog.findMany({ orderBy: { createdAt: "asc" } }),
-      this.db.systemSettings.findUnique({ where: { id: "singleton" } }),
-    ]);
+    const out: Record<string, unknown> = {};
 
-    return {
-      branches,
-      users: usersRaw.map(toSafeUser), // بلا passwordHash/tokens أبداً
-      customers,
-      serviceCategories,
-      services,
-      orders,
-      orderItems,
-      orderStatusHistory,
-      payments,
-      auditLogs,
-      settings,
-    };
+    for (const table of BACKUP_TABLES) {
+      if (table.key === SETTINGS_KEY) {
+        out[SETTINGS_KEY] = await this.db.systemSettings.findUnique({
+          where: { id: SETTINGS_SINGLETON_ID },
+        });
+        continue;
+      }
+
+      const rows = await this.delegateFor(table.delegate).findMany({ orderBy: { id: "asc" } });
+
+      // المستخدمون وحدهم يمرّون بالتعقيم — لا passwordHash ولا رموز إعادة تعيين
+      out[table.key] =
+        table.key === USERS_KEY ? (rows as unknown as User[]).map(toSafeUser) : rows;
+    }
+
+    return out as unknown as Omit<BackupPayload, "metadata">;
+  }
+
+  /**
+   * delegate الخاص بجدول من السِجِلّ.
+   *
+   * التحويل هنا هو الثمن المقصود لقيادة الوحدة بسِجِلّ واحد: أنواع Prisma
+   * المُولَّدة لا تسمح بفهرسة العميل باسم نصّي. الحارس في tests/backup يضمن
+   * أن كل اسم في السِجِلّ نموذجٌ حقيقي في المخطّط، والفحص أدناه يمنع مرور
+   * اسم خاطئ صامتاً وقت التشغيل.
+   */
+  private delegateFor(name: string): PrismaDelegate {
+    const delegate = (this.db as unknown as Record<string, PrismaDelegate | undefined>)[name];
+    if (!delegate || typeof delegate.findMany !== "function") {
+      throw new Error(`جدول غير معروف في عميل Prisma: ${name}`);
+    }
+    return delegate;
   }
 
   createAuditLog(entry: {
@@ -244,72 +259,82 @@ export class BackupRepository {
     const result = await this.db.$transaction(
       async (tx) => {
         let usersPreserved = 0;
+        const restored: BackupCounts = {};
+        const bag = payload as unknown as BackupPayloadMap;
 
-        for (const b of payload.branches) {
-          await tx.branch.upsert({ where: { id: b.id }, create: b, update: b });
-        }
-        for (const c of payload.serviceCategories) {
-          await tx.serviceCategory.upsert({ where: { id: c.id }, create: c, update: c });
-        }
-        for (const s of payload.services) {
-          await tx.service.upsert({ where: { id: s.id }, create: s, update: s });
-        }
+        // نفس ترتيب السِجِلّ — وهو ترتيب المفاتيح الأجنبية الذي يحرسه اختبار
+        // tests/backup/coverage: أي أب بعد ابنه يُوقف CI قبل أن يُوقف الاستعادة.
+        for (const table of BACKUP_TABLES) {
+          if (table.key === SETTINGS_KEY) {
+            const s = payload.settings;
+            if (s) await tx.systemSettings.upsert({ where: { id: s.id }, create: s, update: s });
+            restored[SETTINGS_KEY] = s ? 1 : 0;
+            continue;
+          }
 
-        // المستخدمون: تحديث الحقول الآمنة فقط للموجودين (الحفاظ على المصادقة)
-        for (const u of payload.users) {
-          const existing = await tx.user.findUnique({ where: { id: u.id }, select: { id: true } });
-          if (!existing) continue; // لا يمكن إنشاء مستخدم بلا passwordHash - يُتخطّى
-          await tx.user.update({
-            where: { id: u.id },
-            data: {
-              name: u.name,
-              phone: u.phone,
-              role: u.role,
-              isActive: u.isActive,
-              avatarUrl: u.avatarUrl,
-              branchId: u.branchId,
-            },
-          });
-          usersPreserved++;
-        }
+          // ملف نسخة أقدم لا يحوي الجدول أصلاً — يُتخطّى بلا فشل الاستعادة كلّها
+          const rows = bag[table.key];
+          if (!Array.isArray(rows)) {
+            restored[table.key] = 0;
+            continue;
+          }
 
-        for (const c of payload.customers) {
-          await tx.customer.upsert({ where: { id: c.id }, create: c, update: c });
-        }
-        for (const o of payload.orders) {
-          await tx.order.upsert({ where: { id: o.id }, create: o, update: o });
-        }
-        for (const it of payload.orderItems) {
-          await tx.orderItem.upsert({ where: { id: it.id }, create: it, update: it });
-        }
-        for (const h of payload.orderStatusHistory) {
-          await tx.orderStatusHistory.upsert({ where: { id: h.id }, create: h, update: h });
-        }
-        for (const p of payload.payments) {
-          await tx.payment.upsert({ where: { id: p.id }, create: p, update: p });
-        }
-        if (payload.settings) {
-          const s = payload.settings;
-          await tx.systemSettings.upsert({ where: { id: s.id }, create: s, update: s });
+          if (table.key === USERS_KEY) {
+            usersPreserved = await this.restoreUsers(tx, rows as BackupRow[]);
+            restored[USERS_KEY] = usersPreserved;
+            continue;
+          }
+
+          const delegate = (tx as unknown as Record<string, PrismaDelegate | undefined>)[
+            table.delegate
+          ];
+          if (!delegate || typeof delegate.upsert !== "function") {
+            throw new Error(`جدول غير معروف في عميل Prisma: ${table.delegate}`);
+          }
+          for (const row of rows as BackupRow[]) {
+            await delegate.upsert({ where: { id: row.id }, create: row, update: row });
+          }
+          restored[table.key] = rows.length;
         }
 
-        const restored: BackupCounts = {
-          branches: payload.branches.length,
-          users: usersPreserved,
-          customers: payload.customers.length,
-          serviceCategories: payload.serviceCategories.length,
-          services: payload.services.length,
-          orders: payload.orders.length,
-          orderItems: payload.orderItems.length,
-          orderStatusHistory: payload.orderStatusHistory.length,
-          payments: payload.payments.length,
-          auditLogs: 0,
-        };
         return { restored, usersPreserved };
       },
       { timeout: 120_000 },
     );
 
     return { ...result, durationMs: Date.now() - start };
+  }
+
+  /**
+   * المستخدمون: تحديث الحقول الآمنة فقط للموجودين — passwordHash والرموز
+   * بلا لمس إطلاقاً، فالنسخة لا تحملها أصلاً.
+   *
+   * المستخدم غير الموجود يُتخطّى ولا يُنشأ: إنشاؤه يستلزم اختلاق كلمة سرّ،
+   * والاستعادة ليست موضع إنشاء حسابات. أثرُ ذلك مقصود ويجب معرفته — استعادة
+   * إلى قاعدة فارغة تُرجِع بيانات العمل كاملة بلا حسابات دخول، فيلزم إنشاء
+   * حساب مدير أولاً ثم الاستعادة.
+   */
+  private async restoreUsers(
+    tx: Prisma.TransactionClient,
+    rows: readonly BackupRow[],
+  ): Promise<number> {
+    let count = 0;
+    for (const row of rows) {
+      const existing = await tx.user.findUnique({ where: { id: row.id }, select: { id: true } });
+      if (!existing) continue;
+      await tx.user.update({
+        where: { id: row.id },
+        data: {
+          name: row.name as string,
+          phone: row.phone as string | null,
+          role: row.role as User["role"],
+          isActive: row.isActive as boolean,
+          avatarUrl: row.avatarUrl as string | null,
+          branchId: row.branchId as string | null,
+        },
+      });
+      count++;
+    }
+    return count;
   }
 }
