@@ -100,6 +100,7 @@ describe("backup round-trip (integration)", () => {
     const restored = await api(app)
       .post("/api/v1/backup/restore")
       .set(bearer(adminToken))
+      .set("x-restore-confirm", "true") // حارس مقصود: الاستعادة لا تُنفَّذ بلا تأكيد صريح
       .set("Content-Type", "application/json")
       .send(file);
 
@@ -142,11 +143,25 @@ describe("backup round-trip (integration)", () => {
     const res = await api(app)
       .post("/api/v1/backup/restore")
       .set(bearer(adminToken))
+      .set("x-restore-confirm", "true")
       .set("Content-Type", "application/json")
       .send(Buffer.from(JSON.stringify(legacy), "utf-8"));
 
     expect(res.status).toBe(200);
     expect(await prisma.service.count()).toBe(1);
+  });
+
+  it("الاستعادة بلا رأس التأكيد تُرفض — الحارس نفسه جزء من العقد", async () => {
+    await seedBusinessData();
+    const exported = await api(app).get("/api/v1/backup").set(bearer(adminToken));
+
+    const res = await api(app)
+      .post("/api/v1/backup/restore")
+      .set(bearer(adminToken))
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(exported.text, "utf-8"));
+
+    expect(res.status).toBe(400);
   });
 
   it("النسخة لا تحمل كلمات السرّ المهشّرة ولا رموز الجلسات", async () => {
