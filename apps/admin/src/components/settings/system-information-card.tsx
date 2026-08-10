@@ -1,15 +1,14 @@
 "use client";
 
-import { Download, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { DatabaseBackup, Info } from "lucide-react";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
-import { useDownloadBackupMutation } from "@/hooks/use-settings";
 import type { SystemInfo } from "@/types/settings";
 
 interface SystemInformationCardProps {
   system: SystemInfo;
-  /** settings:manage فقط بالخادم - يُخفى الزر تماماً بدونها (نفس نمط باقي الصفحة) */
+  /** backup:read بالخادم - يُخفى الرابط تماماً بدونها (نفس نمط باقي الصفحة) */
   canManage: boolean;
 }
 
@@ -22,10 +21,19 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-/** قراءة فقط بالكامل - محسوبة من بيئة تشغيل الخادم، لا حقل قابل للتعديل هنا أصلاً */
+/**
+ * قراءة فقط بالكامل - محسوبة من بيئة تشغيل الخادم، لا حقل قابل للتعديل هنا أصلاً.
+ *
+ * حُذف من هنا زرّ «تنزيل نسخة احتياطية كاملة»: كان ينادي GET /backup فيبني نفس
+ * الحمولة ثم يرسلها للمتصفّح بلا حفظ ولا تسجيل ولا بصمة. مجموعةٌ جزئية من صفحة
+ * النسخ الاحتياطي، وأخطر من ذلك أنه مضلِّل — من يضغطه يرى ملفاً ينزل فيظنّ أنه
+ * «أخذ نسخة احتياطية»، ولا شيء حُفظ في الواقع. صار الكارت يشير إلى الصفحة الوحيدة
+ * المسؤولة عن ذلك بدل أن ينافسها.
+ *
+ * وحُذف صفّ «تاريخ البناء»: الخادم يُرجعه null دائماً (settings.utils.ts) لعدم
+ * وجود آلية بناء تُثبّته، فكان صفّاً يشغل مساحة ولا يقول شيئاً.
+ */
 export function SystemInformationCard({ system, canManage }: SystemInformationCardProps) {
-  const backupMutation = useDownloadBackupMutation();
-
   return (
     <Card>
       <CardHeader>
@@ -37,25 +45,14 @@ export function SystemInformationCard({ system, canManage }: SystemInformationCa
         <InfoRow label="اسم التطبيق" value={system.applicationName} />
         <InfoRow label="الإصدار" value={<span dir="ltr">{system.applicationVersion}</span>} />
         <InfoRow label="بيئة التشغيل" value={<span dir="ltr">{system.environment}</span>} />
-        <InfoRow
-          label="تاريخ البناء"
-          value={system.buildDate ?? "غير متاح (لا آلية بناء تُثبِّته حالياً)"}
-        />
       </CardContent>
       {canManage && (
         <CardFooter className="flex-col items-start gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => backupMutation.mutate()}
-            disabled={backupMutation.isPending}
-          >
-            {backupMutation.isPending ? <Spinner /> : <Download aria-hidden />}
-            تنزيل نسخة احتياطية كاملة
-          </Button>
+          <Link href="/backup" className={buttonVariants({ variant: "outline" })}>
+            <DatabaseBackup aria-hidden /> إدارة النسخ الاحتياطي
+          </Link>
           <p className="text-xs text-muted-foreground">
-            يُنزَّل ملف JSON فوراً لجهازك (كل بيانات العمل الحقيقية بلا كلمات سر) - بلا حفظ أي
-            نسخة على الخادم.
+            إنشاء نسخة محفوظة على الخادم، أو جدولتها، أو الاستعادة من نسخة سابقة.
           </p>
         </CardFooter>
       )}
