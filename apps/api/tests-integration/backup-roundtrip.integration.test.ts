@@ -213,24 +213,38 @@ describe("backup round-trip (integration)", () => {
       expect(await prisma.supplier.count()).toBe(1);
     });
 
-    it("تشفير مفعّل بلا مفتاح: يُرفَض الإنشاء برسالة مفهومة لا بنسخة صريحة", async () => {
+    /**
+     * ملف مشفَّر لا يُفكّ ⇒ 409 برسالة مفهومة، لا 500 «حدث خطأ غير متوقّع».
+     *
+     * يغطّي التعيين الذي أسقطه CI أوّل مرّة: كان BackupEncryptionError يمرّ إلى
+     * المعالج المركزي فتضيع الرسالة المكتوبة ليعرف المسؤول ما عليه فعله.
+     *
+     * ملفٌ تالف لا مفتاحٌ مختلف: `env` يُقرأ مرّة واحدة عند الإقلاع، فتغيير
+     * المفتاح في process.env أثناء التشغيل لا يصل إلى الخادم أصلاً — وهو ما
+     * أسقط محاولتي الأولى.
+     */
+    it("ملف مشفَّر تالف يُرفَض بـ409 برسالة مفهومة لا بعطل خادم", async () => {
       await seedBusinessData();
-      await api(app)
-        .put("/api/v1/backup/settings")
+
+      // رأس صحيح (MAGIC + إصدار + ملح + متجه) ثم حشوٌ لا يفكّه أي مفتاح
+      const corrupt = Buffer.concat([
+        Buffer.from("LERPBKE1", "utf8"),
+        Buffer.from([1]),
+        Buffer.alloc(16, 7), // ملح
+        Buffer.alloc(12, 9), // متجه
+        Buffer.alloc(64, 3), // نصّ مشفَّر زائف
+        Buffer.alloc(16, 5), // وسم زائف
+      ]);
+
+      const res = await api(app)
+        .post("/api/v1/backup/restore")
         .set(bearer(adminToken))
-        .send({ encryptionEnabled: true });
+        .set("x-restore-confirm", "true")
+        .set("Content-Type", "application/octet-stream")
+        .send(corrupt);
 
-      const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
-      delete process.env.BACKUP_ENCRYPTION_KEY;
-      try {
-        const res = await api(app).post("/api/v1/backup").set(bearer(adminToken)).send({});
-
-        // 409 لا 500: حالة إعداد يعرف المسؤول ما يفعله حيالها، لا عطل خادم
-        expect(res.status).toBe(409);
-        expect(res.body.message).toContain("BACKUP_ENCRYPTION_KEY");
-      } finally {
-        if (savedKey !== undefined) process.env.BACKUP_ENCRYPTION_KEY = savedKey;
-      }
+      expect(res.status).toBe(409);
+      expect(res.body.message).toMatch(/فكّ تشفير|المفتاح غير مطابق|تالف/);
     });
   });
 
