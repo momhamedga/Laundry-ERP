@@ -20,10 +20,11 @@ import {
 import { MetricCard } from "@/components/cards/metric-card";
 import { formatCurrency } from "@/lib/format";
 import type { DayAggregations } from "@/types/day-closing";
+import { AR_LOCALE } from "../../lib/locale";
 
 /** شبكة بطاقات لقطة اليوم - تُستخدَم للتجميع الحيّ (وردية مفتوحة) وللقطة يوم مُغلق */
 export function SnapshotCards({ snapshot }: { snapshot: DayAggregations }) {
-  const num = (n: number) => n.toLocaleString("ar-EG");
+  const num = (n: number) => n.toLocaleString(AR_LOCALE);
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard title="إجمالي الإيراد" value={formatCurrency(snapshot.totalRevenue)} icon={TrendingUp} tone="success" />

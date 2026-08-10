@@ -6,6 +6,7 @@ import { isValidBarcodeValue } from "../barcode/barcode.codec.js";
 import type { ExportQuery } from "./export.validator.js";
 import type { ReportsRepository } from "./reports.repository.js";
 import type { ReportColumn, ReportTotal } from "./report.template.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 
 /**
  * محرّك التصدير - يُعيد استخدام ReportsRepository الحالي بالكامل (نفس Query
@@ -188,12 +189,12 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 
 function formatMoney(value: Prisma.Decimal | number): string {
   const n = typeof value === "number" ? value : Number(value);
-  return `${n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SUFFIX}`;
+  return `${n.toLocaleString(AR_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SUFFIX}`;
 }
 
 function formatDate(value: Date | null): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString("ar-EG", {
+  return new Date(value).toLocaleString(AR_LOCALE, {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -521,7 +522,7 @@ export class ReportExportService {
         });
         return [
           { label: "إجمالي الأصناف", value: String(s.totalItems) },
-          { label: "إجمالي الكميات", value: Number(s.totalQuantity).toLocaleString("ar-EG") },
+          { label: "إجمالي الكميات", value: Number(s.totalQuantity).toLocaleString(AR_LOCALE) },
         ];
       }
       case "inventory-purchases": {
@@ -547,7 +548,7 @@ export class ReportExportService {
         });
         return [
           { label: "إجمالي قيمة المخزون", value: formatMoney(s.totalValue) },
-          { label: "إجمالي الكميات", value: s.totalQuantity.toLocaleString("ar-EG") },
+          { label: "إجمالي الكميات", value: s.totalQuantity.toLocaleString(AR_LOCALE) },
         ];
       }
       // services/branches/employees/inventory-movements/inventory-suppliers: لا ملخص منفصل
@@ -650,7 +651,7 @@ export class ReportExportService {
             categoryName: s.categoryName,
             unit: s.unit,
             timesUsed: String(s.timesUsed),
-            totalQuantity: Number(s.totalQuantity).toLocaleString("ar-EG"),
+            totalQuantity: Number(s.totalQuantity).toLocaleString(AR_LOCALE),
             totalRevenue: formatMoney(s.totalRevenue),
             isActive: s.isActive ? "نعم" : "لا",
           })),
@@ -707,8 +708,8 @@ export class ReportExportService {
             type: ITEM_TYPE_LABELS[r.type] ?? r.type,
             unit: r.unit,
             supplierName: r.supplier?.name ?? "—",
-            quantity: Number(r.quantity).toLocaleString("ar-EG"),
-            reorderLevel: Number(r.reorderLevel).toLocaleString("ar-EG"),
+            quantity: Number(r.quantity).toLocaleString(AR_LOCALE),
+            reorderLevel: Number(r.reorderLevel).toLocaleString(AR_LOCALE),
             costPrice: formatMoney(r.costPrice),
             stockValue: formatMoney(Number(r.quantity) * Number(r.costPrice)),
             isActive: r.isActive ? "نعم" : "لا",
@@ -738,9 +739,9 @@ export class ReportExportService {
             sku: r.item.sku,
             itemName: r.item.name,
             type: MOVEMENT_TYPE_LABELS[r.type] ?? r.type,
-            quantity: Number(r.quantity).toLocaleString("ar-EG"),
-            beforeQuantity: Number(r.beforeQuantity).toLocaleString("ar-EG"),
-            afterQuantity: Number(r.afterQuantity).toLocaleString("ar-EG"),
+            quantity: Number(r.quantity).toLocaleString(AR_LOCALE),
+            beforeQuantity: Number(r.beforeQuantity).toLocaleString(AR_LOCALE),
+            afterQuantity: Number(r.afterQuantity).toLocaleString(AR_LOCALE),
             reference: r.reference ?? "—",
             createdAt: formatDate(r.createdAt),
           })),
@@ -815,7 +816,7 @@ export class ReportExportService {
             sku: r.sku,
             name: r.name,
             type: ITEM_TYPE_LABELS[r.type] ?? r.type,
-            quantity: Number(r.quantity).toLocaleString("ar-EG"),
+            quantity: Number(r.quantity).toLocaleString(AR_LOCALE),
             costPrice: formatMoney(r.costPrice),
             stockValue: formatMoney(Number(r.quantity) * Number(r.costPrice)),
           })),
@@ -878,7 +879,7 @@ export class ReportExportService {
             sku: r.sku,
             name: r.name,
             type: ITEM_TYPE_LABELS[r.type] ?? r.type,
-            quantity: Number(r.quantity).toLocaleString("ar-EG"),
+            quantity: Number(r.quantity).toLocaleString(AR_LOCALE),
           })),
         };
         fetched += rows.length;
@@ -1040,7 +1041,7 @@ export class ReportExportService {
           rows: rows.map((d) => {
             const snapshot = (d.snapshot as { totalRevenue?: number } | null) ?? null;
             return {
-              businessDate: new Date(d.businessDate).toLocaleDateString("ar-EG"),
+              businessDate: new Date(d.businessDate).toLocaleDateString(AR_LOCALE),
               status: DAY_STATUS_LABELS[d.status] ?? d.status,
               openingCash: formatMoney(d.openingCash),
               totalRevenue: formatMoney(snapshot?.totalRevenue ?? 0),
@@ -1069,7 +1070,7 @@ export class ReportExportService {
         yield {
           rows: rows.map((r) => ({
             employeeName: r.employee.user.name,
-            workDate: new Date(r.workDate).toLocaleDateString("ar-EG"),
+            workDate: new Date(r.workDate).toLocaleDateString(AR_LOCALE),
             clockIn: formatDate(r.clockInAt),
             clockOut: formatDate(r.clockOutAt),
             worked: minutesLabel(r.workedMinutes),

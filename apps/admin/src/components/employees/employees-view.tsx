@@ -31,6 +31,7 @@ import {
 } from "./employee-format";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 import { EmployeeStatusDialog } from "./employee-status-dialog";
+import { AR_LOCALE } from "../../lib/locale";
 
 export function EmployeesView() {
   const { can } = usePermissions();
@@ -70,20 +71,20 @@ export function EmployeesView() {
       {/* إحصائيات */}
       {stats.data && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="إجمالي الموظفين" value={stats.data.total.toLocaleString("ar-EG")} icon={Users} />
+          <MetricCard title="إجمالي الموظفين" value={stats.data.total.toLocaleString(AR_LOCALE)} icon={Users} />
           <MetricCard
             title="نشطون"
-            value={stats.data.byStatus.ACTIVE.toLocaleString("ar-EG")}
+            value={stats.data.byStatus.ACTIVE.toLocaleString(AR_LOCALE)}
             icon={BadgeCheck}
             tone="success"
           />
           <MetricCard
             title="منتهو الخدمة"
-            value={stats.data.byStatus.TERMINATED.toLocaleString("ar-EG")}
+            value={stats.data.byStatus.TERMINATED.toLocaleString(AR_LOCALE)}
             icon={Users}
             tone="warning"
           />
-          <MetricCard title="الأقسام" value={stats.data.departments.toLocaleString("ar-EG")} icon={Building2} />
+          <MetricCard title="الأقسام" value={stats.data.departments.toLocaleString(AR_LOCALE)} icon={Building2} />
         </div>
       )}
 

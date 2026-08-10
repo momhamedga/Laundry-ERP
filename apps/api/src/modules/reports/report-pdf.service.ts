@@ -9,6 +9,7 @@ import {
   type ReportExportService,
 } from "./report-export.service.js";
 import { buildReportFooterTemplate, buildReportHtml } from "./report.template.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 
 /**
  * PDF/Print للتقارير - يُعيد استخدام lib/pdf.ts المشترك حرفياً (بلا متصفح جديد،
@@ -40,7 +41,7 @@ export class ReportPdfService {
       totals,
       landscape: true, // جداول التقارير عريضة الأعمدة دائماً - Landscape ثابت لكل الأنواع الستة
       truncationNote: truncated
-        ? `تم عرض أول ${MAX_DOCUMENT_EXPORT_ROWS.toLocaleString("ar-EG")} صف فقط - استخدم تصدير CSV أو Excel للحصول على البيانات الكاملة`
+        ? `تم عرض أول ${MAX_DOCUMENT_EXPORT_ROWS.toLocaleString(AR_LOCALE)} صف فقط - استخدم تصدير CSV أو Excel للحصول على البيانات الكاملة`
         : undefined,
     });
   }

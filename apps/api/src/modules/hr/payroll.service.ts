@@ -4,6 +4,7 @@ import type { AuthenticatedUser, RequestContext } from "../auth/index.js";
 import { STANDARD_WORK_HOURS, toDateOnly } from "./hr.constants.js";
 import type { GeneratePayrollDto, ListPayrollQueryDto, UpsertSalaryComponentDto } from "./hr.dto.js";
 import type { PayrollRepository } from "./payroll.repository.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 import type {
   PaginationMeta,
   PayrollRunView,
@@ -239,7 +240,7 @@ function componentView(c: { id: string; employeeProfileId: string; type: SalaryC
 }
 
 function defaultLabel(periodStart: Date): string {
-  return new Intl.DateTimeFormat("ar-EG", { year: "numeric", month: "long" }).format(periodStart);
+  return new Intl.DateTimeFormat(AR_LOCALE, { year: "numeric", month: "long" }).format(periodStart);
 }
 
 function round2(n: number): number {

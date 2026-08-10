@@ -1,6 +1,7 @@
 import type { SystemSettings } from "@prisma/client";
 import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
 import type { InvoiceDetail } from "./invoice.types.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 
 /**
  * قالب HTML واحد مُشترَك بين Print (خام) وPDF (عبر Puppeteer) ومرفق البريد -
@@ -25,12 +26,12 @@ const STATUS_COLORS: Record<InvoiceDetail["status"], string> = {
 
 function formatMoney(value: unknown, currency: string): string {
   const n = Number(value);
-  return `${n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+  return `${n.toLocaleString(AR_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 function formatDate(value: Date | null): string {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(value).toLocaleDateString(AR_LOCALE, { year: "numeric", month: "long", day: "numeric" });
 }
 
 function escapeHtml(value: string): string {
@@ -58,7 +59,7 @@ export function buildInvoiceHtml({ invoice, company, qrDataUrl, barcodeDataUrl }
       (item) => `
       <tr>
         <td>${escapeHtml(item.serviceNameSnapshot)}</td>
-        <td class="num">${Number(item.quantity).toLocaleString("ar-EG")}</td>
+        <td class="num">${Number(item.quantity).toLocaleString(AR_LOCALE)}</td>
         <td class="num">${formatMoney(item.unitPrice, currency)}</td>
         <td class="num">${formatMoney(item.total, currency)}</td>
       </tr>`,

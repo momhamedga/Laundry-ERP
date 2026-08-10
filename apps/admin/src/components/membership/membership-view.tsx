@@ -14,6 +14,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import type { MembershipLevel, MembershipTier } from "@/types/loyalty";
 import { LEVEL_LABELS } from "@/components/loyalty/loyalty-format";
 import { TierEditDialog } from "./tier-edit-dialog";
+import { AR_LOCALE } from "../../lib/locale";
 
 export function MembershipView() {
   const { can } = usePermissions();
@@ -79,7 +80,7 @@ export function MembershipView() {
                           {LEVEL_LABELS[t.level]}
                         </span>
                       </TableCell>
-                      <TableCell className="text-end tabular-nums">{t.minLifetimePoints.toLocaleString("ar-EG")}</TableCell>
+                      <TableCell className="text-end tabular-nums">{t.minLifetimePoints.toLocaleString(AR_LOCALE)}</TableCell>
                       <TableCell className="text-end">{Number(t.discountPercent)}%</TableCell>
                       <TableCell className="text-end">{Number(t.extraPointsPercent)}%</TableCell>
                       <TableCell>

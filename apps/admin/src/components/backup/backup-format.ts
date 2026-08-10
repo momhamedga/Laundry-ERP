@@ -1,3 +1,4 @@
+import { AR_LOCALE } from "../../lib/locale";
 /** تنسيقات خاصة بالنسخ الاحتياطي - حجم الملف والمدة */
 
 export function formatBytes(bytes: number | null): string {
@@ -9,14 +10,14 @@ export function formatBytes(bytes: number | null): string {
     value /= 1024;
     unit++;
   }
-  return `${value.toLocaleString("ar-EG", { maximumFractionDigits: 1 })} ${units[unit]}`;
+  return `${value.toLocaleString(AR_LOCALE, { maximumFractionDigits: 1 })} ${units[unit]}`;
 }
 
 export function formatDuration(ms: number | null): string {
   if (ms === null || ms === 0) return "—";
   if (ms < 1000) return `${ms} م.ث`;
   const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toLocaleString("ar-EG", { maximumFractionDigits: 1 })} ث`;
+  if (seconds < 60) return `${seconds.toLocaleString(AR_LOCALE, { maximumFractionDigits: 1 })} ث`;
   const minutes = Math.floor(seconds / 60);
   const rem = Math.round(seconds % 60);
   return `${minutes} د ${rem} ث`;

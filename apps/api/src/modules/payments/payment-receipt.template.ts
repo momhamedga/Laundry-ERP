@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PaymentTxStatus, SystemSettings } from "@prisma/client";
 import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
 import type { PaymentRow } from "./payments.types.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 
 /**
  * قالب HTML مُصغَّر لإيصال دفع - أصغر من مستند الفاتورة (نصف صفحة). يُستهلَك
@@ -34,11 +35,11 @@ const STATUS_COLORS: Record<PaymentTxStatus, string> = {
 
 function formatMoney(value: Prisma.Decimal | string | number, currency: string): string {
   const n = Number(value);
-  return `${n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+  return `${n.toLocaleString(AR_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 function formatDateTime(value: Date): string {
-  return new Date(value).toLocaleString("ar-EG", {
+  return new Date(value).toLocaleString(AR_LOCALE, {
     year: "numeric",
     month: "long",
     day: "numeric",

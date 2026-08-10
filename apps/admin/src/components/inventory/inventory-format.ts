@@ -1,3 +1,4 @@
+import { AR_LOCALE } from "../../lib/locale";
 import type {
   AlertType,
   InventoryItemType,
@@ -46,5 +47,5 @@ export const ALERT_LABELS: Record<AlertType, string> = {
 
 /** رقم منسّق بلا كسور زائدة (الكميات Decimal تصل كنص) */
 export function fmtQty(value: string | number): string {
-  return Number(value).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
+  return Number(value).toLocaleString(AR_LOCALE, { maximumFractionDigits: 3 });
 }

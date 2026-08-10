@@ -24,6 +24,7 @@ import { getErrorMessage } from "@/lib/axios";
 import type { ListAccountsParams, LoyaltyAccountRow, MembershipLevel } from "@/types/loyalty";
 import { LEVEL_BADGE, LEVEL_LABELS } from "./loyalty-format";
 import { PointsActionDialog } from "./points-action-dialog";
+import { AR_LOCALE } from "../../lib/locale";
 
 export function AccountsTab() {
   const { can } = usePermissions();
@@ -43,9 +44,9 @@ export function AccountsTab() {
       {stats && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="حسابات الولاء" value={String(stats.totalAccounts)} icon={Users} />
-          <StatCard label="النقاط الحالية" value={stats.totalCurrentPoints.toLocaleString("ar-EG")} icon={Coins} tone="success" />
-          <StatCard label="نقاط العمر" value={stats.totalLifetimePoints.toLocaleString("ar-EG")} icon={Sparkles} />
-          <StatCard label="المستبدلة" value={stats.totalRedeemedPoints.toLocaleString("ar-EG")} icon={Award} />
+          <StatCard label="النقاط الحالية" value={stats.totalCurrentPoints.toLocaleString(AR_LOCALE)} icon={Coins} tone="success" />
+          <StatCard label="نقاط العمر" value={stats.totalLifetimePoints.toLocaleString(AR_LOCALE)} icon={Sparkles} />
+          <StatCard label="المستبدلة" value={stats.totalRedeemedPoints.toLocaleString(AR_LOCALE)} icon={Award} />
         </div>
       )}
 
@@ -99,9 +100,9 @@ export function AccountsTab() {
                         {a.customer.name} <span dir="ltr" className="text-xs text-muted-foreground">{a.customer.phone}</span>
                       </TableCell>
                       <TableCell><Badge variant={LEVEL_BADGE[a.membershipLevel]}>{LEVEL_LABELS[a.membershipLevel]}</Badge></TableCell>
-                      <TableCell className="text-end tabular-nums font-medium">{a.currentPoints.toLocaleString("ar-EG")}</TableCell>
-                      <TableCell className="text-end tabular-nums">{a.lifetimePoints.toLocaleString("ar-EG")}</TableCell>
-                      <TableCell className="text-end tabular-nums text-muted-foreground">{a.redeemedPoints.toLocaleString("ar-EG")}</TableCell>
+                      <TableCell className="text-end tabular-nums font-medium">{a.currentPoints.toLocaleString(AR_LOCALE)}</TableCell>
+                      <TableCell className="text-end tabular-nums">{a.lifetimePoints.toLocaleString(AR_LOCALE)}</TableCell>
+                      <TableCell className="text-end tabular-nums text-muted-foreground">{a.redeemedPoints.toLocaleString(AR_LOCALE)}</TableCell>
                       {canManage && (
                         <TableCell className="text-end">
                           <Button variant="ghost" size="sm" onClick={() => { setTarget(a); setDialogOpen(true); }}>

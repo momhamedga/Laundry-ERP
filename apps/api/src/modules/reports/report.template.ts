@@ -1,5 +1,6 @@
 import type { SystemSettings } from "@prisma/client";
 import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
+import { AR_LOCALE } from "../../constants/locale.js";
 
 /**
  * قالب HTML مشترك بين PDF (عبر lib/pdf.ts المُعاد استخدامه) وPrint (HTML خام) -
@@ -45,7 +46,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatDateTime(value: Date): string {
-  return value.toLocaleString("ar-EG", {
+  return value.toLocaleString(AR_LOCALE, {
     year: "numeric",
     month: "long",
     day: "numeric",

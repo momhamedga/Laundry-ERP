@@ -1,19 +1,20 @@
+import { AR_LOCALE } from "./locale";
 /** يقبل رقماً أو نصاً (حقول Decimal تصل كنص من الخادم) */
 export function formatCurrency(value: number | string): string {
   const amount = typeof value === "string" ? Number(value) : value;
-  return `${amount.toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
+  return `${amount.toLocaleString(AR_LOCALE, { maximumFractionDigits: 2 })} ج.م`;
 }
 
 export function formatDate(value: string | Date | null): string {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
+  return date.toLocaleDateString(AR_LOCALE, { year: "numeric", month: "short", day: "numeric" });
 }
 
 export function formatDateTime(value: string | Date | null): string {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleString("ar-EG", {
+  return date.toLocaleString(AR_LOCALE, {
     year: "numeric",
     month: "short",
     day: "numeric",
