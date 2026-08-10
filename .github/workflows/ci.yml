@@ -93,6 +93,8 @@ jobs:
       JWT_ACCESS_SECRET: "ci-access-secret-at-least-32-characters-long"
       JWT_REFRESH_SECRET: "ci-refresh-secret-at-least-32-characters-long"
       DROP_TEST_SCHEMA: "1" # تنظيف صريح للschema بعد انتهاء المجموعة
+      # يلزم لاختبار تشفير النسخ: بلا مفتاح يرفض النظام إنشاء نسخة مشفّرة عمداً
+      BACKUP_ENCRYPTION_KEY: "ci-only-backup-encryption-key-not-a-real-secret"
     steps:
       - uses: actions/checkout@v4
 

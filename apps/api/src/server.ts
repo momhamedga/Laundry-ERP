@@ -1,9 +1,13 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
+import { flushObservability, initObservability } from "./config/observability.js";
 import { prisma } from "./lib/prisma.js";
 import { closePdfBrowser } from "./lib/pdf.js";
 import { startBackupScheduler } from "./modules/backup/index.js";
 import { startNotificationScheduler } from "./modules/notifications/index.js";
+
+// قبل إنشاء التطبيق: أي عطل أثناء الإقلاع نفسه يجب أن يُلتقط أيضاً
+initObservability();
 
 const app = createApp();
 
@@ -24,7 +28,7 @@ async function shutdown(signal: string): Promise<void> {
   stopNotificationScheduler();
   stopBackupScheduler();
   server.close(async () => {
-    await Promise.allSettled([closePdfBrowser(), prisma.$disconnect()]);
+    await Promise.allSettled([closePdfBrowser(), prisma.$disconnect(), flushObservability()]);
     process.exit(0);
   });
 }

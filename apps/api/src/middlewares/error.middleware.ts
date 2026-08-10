@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { env } from "../config/env.js";
 import { ERROR_CODES } from "../constants/error-codes.js";
+import { captureError } from "../config/observability.js";
 
 /**
  * خطأ تشغيلي معروف يمكن إظهار رسالته للعميل بأمان
@@ -82,6 +83,17 @@ export function errorHandler(
   }
 
   console.error("💥 Unhandled error:", err);
+
+  /**
+   * التبليغ من هنا وحده: هذه النقطة هي حيث يصل كل خطأ غير متوقَّع، وما فوقها
+   * (ApiError وZodError وأخطاء تحليل الجسم) عاد قبل الوصول إليها — وهي أخطاء
+   * تشغيلية معروفة لا أعطال. إرسالها كان سيُغرق التنبيهات بـ«العميل غير موجود»
+   * حتى تُتجاهَل كلّها فيضيع العطل الحقيقي وسطها.
+   */
+  captureError(err, {
+    userId: (_req as { user?: { id?: string } }).user?.id,
+    route: `${_req.method} ${_req.originalUrl}`,
+  });
 
   // انقطاع الاتصال بقاعدة البيانات ليس خطأً برمجياً، ورسالة «Internal server error»
   // تترك المستخدم بلا أي دليل على السبب أو الحل. نبقي على 500 حفاظاً على العقد

@@ -35,6 +35,12 @@ const envSchema = z.object({
   BACKUP_B2_KEY_ID: z.string().optional(),
   BACKUP_B2_APP_KEY: z.string().optional(),
   BACKUP_B2_BUCKET: z.string().optional(),
+
+  /**
+   * تتبّع الأخطاء (اختياري بالكامل). غيابه يعني تعطيل التتبّع بلا أي أثر على
+   * التشغيل — لا يجوز أن يتوقّف النظام لأن خدمة مراقبة غير مضبوطة.
+   */
+  SENTRY_DSN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

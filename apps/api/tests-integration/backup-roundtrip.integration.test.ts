@@ -212,6 +212,26 @@ describe("backup round-trip (integration)", () => {
       expect(restored.status).toBe(200);
       expect(await prisma.supplier.count()).toBe(1);
     });
+
+    it("تشفير مفعّل بلا مفتاح: يُرفَض الإنشاء برسالة مفهومة لا بنسخة صريحة", async () => {
+      await seedBusinessData();
+      await api(app)
+        .put("/api/v1/backup/settings")
+        .set(bearer(adminToken))
+        .send({ encryptionEnabled: true });
+
+      const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
+      delete process.env.BACKUP_ENCRYPTION_KEY;
+      try {
+        const res = await api(app).post("/api/v1/backup").set(bearer(adminToken)).send({});
+
+        // 409 لا 500: حالة إعداد يعرف المسؤول ما يفعله حيالها، لا عطل خادم
+        expect(res.status).toBe(409);
+        expect(res.body.message).toContain("BACKUP_ENCRYPTION_KEY");
+      } finally {
+        if (savedKey !== undefined) process.env.BACKUP_ENCRYPTION_KEY = savedKey;
+      }
+    });
   });
 
   it("النسخة لا تحمل كلمات السرّ المهشّرة ولا رموز الجلسات", async () => {

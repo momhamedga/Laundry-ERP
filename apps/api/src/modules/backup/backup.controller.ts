@@ -10,6 +10,7 @@ import {
   BackupValidationError,
   type BackupService,
 } from "./backup.service.js";
+import { BackupEncryptionError } from "./backup.crypto.js";
 import { buildBackupFilename } from "./backup.utils.js";
 import {
   createBackupSchema,
@@ -29,6 +30,13 @@ function mapError(err: unknown): never {
   if (err instanceof BackupNotFoundError) throw new ApiError(404, err.message);
   if (err instanceof BackupConflictError) throw new ApiError(409, err.message);
   if (err instanceof BackupValidationError) throw new ApiError(400, err.message);
+  /**
+   * خطأ التشفير حالة إعداد لا عطل خادم: «التشفير مفعّل والمفتاح غير مضبوط»
+   * أو «المفتاح لا يفكّ هذا الملف». تركه يصل إلى المعالج المركزي يحوّله إلى
+   * 500 و«حدث خطأ غير متوقّع» — فتضيع الرسالة التي كُتبت خصّيصاً ليعرف المسؤول
+   * ما عليه فعله، وهي نصف الغرض من الرفض أصلاً.
+   */
+  if (err instanceof BackupEncryptionError) throw new ApiError(409, err.message);
   throw err;
 }
 
@@ -49,13 +57,17 @@ export class BackupController {
   /** POST /backup - إنشاء نسخة مُخزَّنة على الخادم + تسجيلها */
   create: RequestHandler = asyncHandler(async (req, res) => {
     const input = createBackupSchema.parse(req.body ?? {});
-    const record = await this.service.createStoredBackup(
-      "MANUAL",
-      requireUser(req),
-      getRequestContext(req),
-      input.provider,
-    );
-    sendSuccess(res, { backup: record }, "Backup created", 201);
+    try {
+      const record = await this.service.createStoredBackup(
+        "MANUAL",
+        requireUser(req),
+        getRequestContext(req),
+        input.provider,
+      );
+      sendSuccess(res, { backup: record }, "Backup created", 201);
+    } catch (err) {
+      mapError(err);
+    }
   });
 
   /** GET /backup/history */
