@@ -164,6 +164,56 @@ describe("backup round-trip (integration)", () => {
     expect(res.status).toBe(400);
   });
 
+  /**
+   * التشفير من طرف إلى طرف عبر الـAPI الحقيقي.
+   *
+   * اختبارات الوحدة تثبت أن المُشفِّر يعمل؛ هذه تثبت أن النظام **يستخدمه** —
+   * وهو بالضبط ما كان مفقوداً حين كان الإعداد معروضاً والشيفرة تكتب
+   * `encrypted: false` نصّاً ثابتاً.
+   */
+  describe("التشفير", () => {
+    it("نسخة مشفَّرة: الملف المخزَّن لا يحوي نصّاً صريحاً، والاستعادة منه تنجح", async () => {
+      const seeded = await seedBusinessData();
+
+      await api(app)
+        .put("/api/v1/backup/settings")
+        .set(bearer(adminToken))
+        .send({ encryptionEnabled: true });
+
+      const created = await api(app).post("/api/v1/backup").set(bearer(adminToken)).send({});
+      expect(created.status).toBe(201);
+      const record = created.body.data.backup;
+      expect(record.encrypted, "السجلّ يجب أن يعلن التشفير").toBe(true);
+      expect(record.filename).toMatch(/\.enc$/);
+
+      // التنزيل يعيد الملف المخزَّن كما هو (مشفَّراً) — لا نصّ صريح فيه
+      const downloaded = await api(app)
+        .get(`/api/v1/backup/history/${record.id}/download`)
+        .set(bearer(adminToken))
+        .responseType("blob");
+      expect(downloaded.status).toBe(200);
+
+      const raw = Buffer.from(downloaded.body as Buffer);
+      expect(raw.subarray(0, 8).toString("utf8")).toBe("LERPBKE1");
+      expect(raw.toString("latin1")).not.toContain("مورّد الاختبار");
+      expect(raw.toString("latin1")).not.toContain(seeded.supplier.id);
+
+      // والاستعادة من الملف المشفَّر نفسه تعمل
+      await prisma.supplier.delete({ where: { id: seeded.supplier.id } });
+      expect(await prisma.supplier.count()).toBe(0);
+
+      const restored = await api(app)
+        .post("/api/v1/backup/restore")
+        .set(bearer(adminToken))
+        .set("x-restore-confirm", "true")
+        .set("Content-Type", "application/octet-stream")
+        .send(raw);
+
+      expect(restored.status).toBe(200);
+      expect(await prisma.supplier.count()).toBe(1);
+    });
+  });
+
   it("النسخة لا تحمل كلمات السرّ المهشّرة ولا رموز الجلسات", async () => {
     await seedBusinessData();
     const res = await api(app).get("/api/v1/backup").set(bearer(adminToken));

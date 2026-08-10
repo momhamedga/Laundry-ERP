@@ -1,9 +1,9 @@
 import { createReadStream, createWriteStream, type ReadStream } from "node:fs";
-import { access, constants, mkdir, rm, stat } from "node:fs/promises";
+import { access, appendFile, constants, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, type Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { createGzip } from "node:zlib";
+import { createGzip, gunzipSync } from "node:zlib";
 import type {
   BackupProvider,
   BackupRecord,
@@ -18,6 +18,13 @@ import { env } from "../../config/env.js";
 import { resolveBackupDir } from "./backup.constants.js";
 import type { BackupRepository } from "./backup.repository.js";
 import { reviveDates } from "./backup.repository.js";
+import {
+  BackupEncryptionError,
+  createEncryptor,
+  decryptBackup,
+  hasEncryptionKey,
+  isEncryptedBackup,
+} from "./backup.crypto.js";
 import { BackupStorageRegistry } from "./backup.storage.js";
 import { BACKUP_TABLES, SETTINGS_KEY } from "./backup.tables.js";
 import type {
@@ -105,7 +112,24 @@ export class BackupService {
 
     const now = new Date();
     const compressed = settings.compressionEnabled;
-    const filename = buildStoredBackupFilename(now, compressed);
+
+    /**
+     * التشفير مفعّل بلا مفتاح: نرفض إنشاء النسخة بدل كتابة ملفٍ صريح.
+     *
+     * البديل — الكتابة بلا تشفير مع تسجيل ذلك — يضع على القرص ملفاً يحمل أسماء
+     * كل العملاء وأرقام هواتفهم وفواتيرهم، وهو قرار خصوصية ليس للنظام أن يتّخذه
+     * نيابةً عن المسؤول. الرفض يُبقي الخيار له: يضبط المفتاح أو يُطفئ التشفير،
+     * وكلاهما فعلٌ صريح. والفشل ظاهر (سجلّ FAILED + فحص صحّة حرِج) لا صامت.
+     */
+    const encrypted = settings.encryptionEnabled;
+    if (encrypted && !hasEncryptionKey()) {
+      throw new BackupEncryptionError(
+        "التشفير مفعّل في الإعدادات لكن BACKUP_ENCRYPTION_KEY غير مضبوط على الخادم. " +
+          "لن تُنشأ نسخة غير مشفّرة دون قرار صريح: اضبط المفتاح أو أوقف التشفير.",
+      );
+    }
+
+    const filename = buildStoredBackupFilename(now, compressed, encrypted);
 
     // سجل موجود (retry) أو جديد
     const record = existingRecordId
@@ -120,7 +144,7 @@ export class BackupService {
           trigger,
           status: "IN_PROGRESS",
           compressed,
-          encrypted: false, // راجع "القيود": التشفير مُخزَّن كإعداد لا يُطبَّق هذه المرحلة
+          encrypted,
           createdById: actor?.id ?? null,
         });
 
@@ -134,12 +158,27 @@ export class BackupService {
       await mkdir(dir, { recursive: true });
       const filePath = join(dir, record.filename);
 
+      /**
+       * سلسلة الكتابة: JSON → [ضغط] → [تشفير] → قرص، متدفّقة بلا تحميل النسخة
+       * كاملةً في الذاكرة. الترتيب مقصود — الضغط قبل التشفير، إذ لا ينضغط
+       * ناتجُ تشفيرٍ سليم أصلاً.
+       *
+       * وسم GCM لا يُنتَج إلا عند إغلاق المُشفِّر، فيُلحَق بالملف بعد انتهاء
+       * التدفّق. والرأس يُكتب أولاً ليكون الملف مقروءاً من بدايته.
+       */
       const json = JSON.stringify(payload, null, 2);
       const source = Readable.from([json]);
-      if (compressed) {
-        await pipeline(source, createGzip(), createWriteStream(filePath));
+      const stages: (Readable | Transform)[] = [source];
+      if (compressed) stages.push(createGzip());
+
+      if (encrypted) {
+        const { header, cipher, readAuthTag } = createEncryptor();
+        await writeFile(filePath, header);
+        stages.push(cipher);
+        await pipeline(...(stages as [Readable, Transform]), createWriteStream(filePath, { flags: "a" }));
+        await appendFile(filePath, readAuthTag());
       } else {
-        await pipeline(source, createWriteStream(filePath));
+        await pipeline(...(stages as [Readable]), createWriteStream(filePath));
       }
 
       const [checksum, fileStat] = await Promise.all([
@@ -334,8 +373,9 @@ export class BackupService {
     const warnings: string[] = [];
     let payload: BackupPayload | null = null;
     try {
-      payload = JSON.parse(buffer.toString("utf-8"), reviveDates) as BackupPayload;
-    } catch {
+      payload = JSON.parse(this.toPlainJson(buffer), reviveDates) as BackupPayload;
+    } catch (err) {
+      // المعاينة لا ترمي — تُعيد سبباً مقروءاً ليظهر في الحوار قبل أي كتابة
       return {
         valid: false,
         checksum,
@@ -343,7 +383,9 @@ export class BackupService {
         counts: null,
         versionMatch: false,
         currentVersion: APPLICATION_VERSION,
-        warnings: ["الملف ليس JSON صالحاً"],
+        warnings: [
+          err instanceof BackupEncryptionError ? err.message : "الملف ليس JSON صالحاً",
+        ],
       };
     }
 
@@ -383,8 +425,9 @@ export class BackupService {
 
     let payload: BackupPayload;
     try {
-      payload = JSON.parse(buffer.toString("utf-8"), reviveDates) as BackupPayload;
-    } catch {
+      payload = JSON.parse(this.toPlainJson(buffer), reviveDates) as BackupPayload;
+    } catch (err) {
+      if (err instanceof BackupEncryptionError) throw err;
       throw new BackupValidationError("ملف النسخة الاحتياطية ليس JSON صالحاً.");
     }
     if (!this.isValidPayload(payload)) {
@@ -498,16 +541,27 @@ export class BackupService {
       });
     }
 
-    // التشفير (مُخزَّن لا يُطبَّق هذه المرحلة - شفافية)
+    /**
+     * التشفير — مفعّل بلا مفتاح حالةٌ حرِجة لا تحذيرية: كل نسخة مجدولة ستفشل
+     * حتى يُحسم الأمر، وهو ما نريده ظاهراً لا مدفوناً بين التحذيرات.
+     */
     if (settings.encryptionEnabled) {
-      checks.push({
-        key: "encryption",
-        label: "التشفير",
-        level: "WARNING",
-        detail: env.BACKUP_ENCRYPTION_KEY
-          ? "مفعّل بالإعدادات - التطبيق الفعلي مؤجَّل (قيد Phase 6)"
-          : "مفعّل بالإعدادات لكن BACKUP_ENCRYPTION_KEY غير مضبوط",
-      });
+      checks.push(
+        hasEncryptionKey()
+          ? {
+              key: "encryption",
+              label: "التشفير",
+              level: "HEALTHY",
+              detail: "مفعّل — AES-256-GCM. فقدان المفتاح يعني فقدان كل النسخ.",
+            }
+          : {
+              key: "encryption",
+              label: "التشفير",
+              level: "CRITICAL",
+              detail:
+                "مفعّل بالإعدادات لكن BACKUP_ENCRYPTION_KEY غير مضبوط — لن تُنشأ أي نسخة حتى يُضبط أو يُوقَف التشفير.",
+            },
+      );
     }
 
     const level = this.worstLevel(checks.map((c) => c.level));
@@ -600,6 +654,26 @@ export class BackupService {
    * أعداد كل جدول مشمول — مقادة بالسِجِلّ فتشمل أي جدول يُضاف تلقائياً.
    * الجدول الغائب (ملف نسخة أقدم) يُعدّ صفراً لا يُسقِط المعاينة.
    */
+  /**
+   * يحوّل ملف نسخة مرفوعاً إلى نصّ JSON، أياً كانت صيغته.
+   *
+   * الملف قد يكون صريحاً أو مضغوطاً أو مشفَّراً أو الاثنين — والمستخدم يرفع ما
+   * لديه ولا يُتوقَّع منه أن يعرف. الاستدلال بالبصمات لا بالامتداد: الامتداد
+   * يتغيّر بإعادة تسمية، والبصمة لا.
+   */
+  private toPlainJson(buffer: Buffer): string {
+    let body = buffer;
+
+    if (isEncryptedBackup(body)) {
+      body = decryptBackup(body); // يرمي BackupEncryptionError برسالة مفهومة
+    }
+    // 0x1f 0x8b = بصمة gzip
+    if (body.length > 2 && body[0] === 0x1f && body[1] === 0x8b) {
+      body = gunzipSync(body);
+    }
+    return body.toString("utf-8");
+  }
+
   private countsOf(data: Omit<BackupPayload, "metadata">): BackupCounts {
     const counts: BackupCounts = {};
     const bag = data as unknown as Record<string, unknown>;

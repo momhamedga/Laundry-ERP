@@ -28,10 +28,20 @@ export function buildBackupFilename(date: Date): string {
   return `laundry-erp-backup-${stamp}.json`;
 }
 
-/** اسم ملف نسخة مُخزَّنة على القرص - يراعي الضغط (.json.gz) */
-export function buildStoredBackupFilename(date: Date, compressed: boolean): string {
+/**
+ * اسم ملف نسخة مُخزَّنة على القرص - يراعي الضغط (.gz) والتشفير (.enc).
+ *
+ * الامتداد يعكس ما جرى على الملف فعلاً: من يجد `‎.json.gz.enc` في مجلد أو في
+ * bucket يعرف أنه لن يفتحه بمحرّر نصوص، ويعرف أن فقدان المفتاح يعني فقدانه.
+ * (القراءة نفسها تستدلّ بالبصمات لا بالامتداد — الامتداد يتغيّر بإعادة تسمية.)
+ */
+export function buildStoredBackupFilename(
+  date: Date,
+  compressed: boolean,
+  encrypted = false,
+): string {
   const base = buildBackupFilename(date);
-  return compressed ? `${base}.gz` : base;
+  return `${base}${compressed ? ".gz" : ""}${encrypted ? ".enc" : ""}`;
 }
 
 /**
