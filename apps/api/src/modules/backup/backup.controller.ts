@@ -20,7 +20,7 @@ import {
 
 /** يضمن وجود req.user - تُستدعى فقط بعد authenticate */
 function requireUser(req: Request): AuthenticatedUser {
-  if (!req.user) throw new ApiError(401, "Authentication required");
+  if (!req.user) throw new ApiError(401, "يلزم تسجيل الدخول للمتابعة.");
   return req.user;
 }
 
@@ -68,7 +68,7 @@ export class BackupController {
   /** GET /backup/history/:id/download - تنزيل ملف نسخة مُخزَّنة (Streaming) */
   downloadStored: RequestHandler = asyncHandler(async (req, res) => {
     const id = req.params.id;
-    if (typeof id !== "string" || !id) throw new ApiError(400, "Missing backup id");
+    if (typeof id !== "string" || !id) throw new ApiError(400, "مُعرِّف النسخة الاحتياطية مفقود.");
     try {
       const { stream, filename, size } = await this.service.openBackupFile(id);
       res.setHeader("Content-Type", "application/octet-stream");
@@ -83,7 +83,7 @@ export class BackupController {
   /** DELETE /backup/history/:id - حذف نسخة واحدة (Soft delete + حذف الملف) */
   remove: RequestHandler = asyncHandler(async (req, res) => {
     const id = req.params.id;
-    if (typeof id !== "string" || !id) throw new ApiError(400, "Missing backup id");
+    if (typeof id !== "string" || !id) throw new ApiError(400, "مُعرِّف النسخة الاحتياطية مفقود.");
     try {
       await this.service.deleteRecord(id, requireUser(req), getRequestContext(req));
       sendSuccess(res, { id }, "Backup deleted");
@@ -101,7 +101,7 @@ export class BackupController {
   /** POST /backup/retry/:id - إعادة محاولة نسخة فاشلة */
   retry: RequestHandler = asyncHandler(async (req, res) => {
     const id = req.params.id;
-    if (typeof id !== "string" || !id) throw new ApiError(400, "Missing backup id");
+    if (typeof id !== "string" || !id) throw new ApiError(400, "مُعرِّف النسخة الاحتياطية مفقود.");
     try {
       const record = await this.service.retry(id, requireUser(req), getRequestContext(req));
       sendSuccess(res, { backup: record }, "Backup retried");
@@ -124,7 +124,7 @@ export class BackupController {
       expectedChecksum: req.header("x-expected-checksum") || undefined,
     });
     if (!parsed.success) {
-      throw new ApiError(400, "Restore requires explicit confirmation (x-restore-confirm: true)");
+      throw new ApiError(400, "الاستعادة تتطلّب تأكيداً صريحاً قبل التنفيذ.");
     }
     const buffer = requireRawBody(req);
     try {
@@ -174,7 +174,7 @@ export class BackupController {
 function requireRawBody(req: Request): Buffer {
   const body: unknown = req.body;
   if (!Buffer.isBuffer(body) || body.length === 0) {
-    throw new ApiError(400, "Empty or missing backup file in request body");
+    throw new ApiError(400, "ملف النسخة الاحتياطية مفقود أو فارغ.");
   }
   return body;
 }

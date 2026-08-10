@@ -7,12 +7,18 @@ import { branchKeys } from "@/lib/query-keys";
 import * as branchesService from "@/services/branches.service";
 import type { CreateBranchInput, ListBranchesParams, UpdateBranchInput } from "@/types/branch";
 
-/** الفروع النشطة - لتعبئة فلتر الفرع (نادراً ما تتغير) */
-export function useActiveBranchesQuery() {
+/**
+ * الفروع النشطة - لتعبئة فلتر الفرع (نادراً ما تتغير).
+ *
+ * `enabled` لأن معالج الطلب لا يحتاجها إلا لحساب بلا فرع مُعيَّن؛ موظّف الفرع
+ * لا يرى حقل الاختيار أصلاً فلا داعي لطلب شبكة عند كل فتح للمعالج.
+ */
+export function useActiveBranchesQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: branchKeys.lists(),
     queryFn: () => branchesService.listActiveBranches(),
     staleTime: 5 * 60_000,
+    enabled: options?.enabled ?? true,
   });
 }
 

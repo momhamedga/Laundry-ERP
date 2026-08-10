@@ -82,7 +82,7 @@ export function computeTotals(
   const priced: PricedOrderItem[] = items.map((item, index) => {
     const service = services.get(item.serviceId);
     if (!service) {
-      throw new ApiError(404, `Service not found for item #${index + 1}`);
+      throw new ApiError(404, `الخدمة غير موجودة في البند رقم ${index + 1}.`);
     }
 
     const quantity = new Prisma.Decimal(item.quantity);
@@ -92,7 +92,7 @@ export function computeTotals(
     if (discount.gt(gross)) {
       throw new ApiError(
         400,
-        `Item #${index + 1} discount exceeds line amount (${gross.toFixed(2)})`,
+        `خصم البند رقم ${index + 1} يتجاوز قيمته (${gross.toFixed(2)}).`,
       );
     }
 
@@ -113,7 +113,7 @@ export function computeTotals(
   const discount = new Prisma.Decimal(orderDiscount);
 
   if (discount.gt(subtotal)) {
-    throw new ApiError(400, `Order discount exceeds subtotal (${subtotal.toFixed(2)})`);
+    throw new ApiError(400, `خصم الطلب يتجاوز المجموع الفرعي (${subtotal.toFixed(2)}).`);
   }
 
   return { subtotal, discount, total: subtotal.sub(discount), items: priced };

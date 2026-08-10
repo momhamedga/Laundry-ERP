@@ -45,14 +45,14 @@ export async function applyStockMovement(
     where: { id: p.itemId },
     select: { quantity: true },
   });
-  if (!item) throw new ApiError(404, "Inventory item not found");
+  if (!item) throw new ApiError(404, "الصنف غير موجود في المخزون.");
 
   const before = Number(item.quantity);
   const increasing = p.directionOverride
     ? p.directionOverride === "increase"
     : INCREASING_TYPES.has(p.type);
   const after = increasing ? before + p.quantity : before - p.quantity;
-  if (after < 0) throw new ApiError(400, "Insufficient stock for this movement");
+  if (after < 0) throw new ApiError(400, "الرصيد غير كافٍ لتنفيذ هذه الحركة.");
 
   await tx.inventoryItem.update({ where: { id: p.itemId }, data: { quantity: after } });
   await tx.inventoryTransaction.create({

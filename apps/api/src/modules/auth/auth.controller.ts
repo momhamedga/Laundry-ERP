@@ -20,7 +20,7 @@ import {
 
 /** يضمن وجود req.user - تُستدعى فقط بعد authenticate */
 function requireUser(req: Request): AuthenticatedUser {
-  if (!req.user) throw new ApiError(401, "Authentication required");
+  if (!req.user) throw new ApiError(401, "يلزم تسجيل الدخول للمتابعة.");
   return req.user;
 }
 
@@ -49,7 +49,7 @@ export class AuthController {
   /** POST /refresh - Rotation: كوكي جديد + access token جديد */
   refresh: RequestHandler = asyncHandler(async (req, res: Response) => {
     const rawToken = readRefreshCookie(req);
-    if (!rawToken) throw new ApiError(401, "Refresh token missing");
+    if (!rawToken) throw new ApiError(401, "الجلسة غير مكتملة. سجّل الدخول من جديد.");
 
     try {
       const tokens = await this.service.refresh(rawToken, getRequestContext(req));

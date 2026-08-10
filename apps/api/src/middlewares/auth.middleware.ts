@@ -15,7 +15,7 @@ import { ApiError } from "./error.middleware.js";
 export const authenticate: RequestHandler = asyncHandler(async (req, _res, next) => {
   const header = req.get("authorization");
   if (!header?.startsWith("Bearer ")) {
-    throw new ApiError(401, "Authentication required");
+    throw new ApiError(401, "يلزم تسجيل الدخول للمتابعة.");
   }
 
   const payload = verifyAccessToken(header.slice("Bearer ".length).trim());
@@ -35,7 +35,7 @@ export const authenticate: RequestHandler = asyncHandler(async (req, _res, next)
   });
 
   if (!user || !user.isActive) {
-    throw new ApiError(401, "Account is inactive or no longer exists");
+    throw new ApiError(401, "الحساب موقوف أو لم يعد موجوداً.");
   }
 
   // إبطال التوكينات الصادرة قبل آخر تغيير لكلمة السر
@@ -43,7 +43,7 @@ export const authenticate: RequestHandler = asyncHandler(async (req, _res, next)
     user.passwordChangedAt &&
     payload.iat * 1000 < user.passwordChangedAt.getTime()
   ) {
-    throw new ApiError(401, "Token invalidated by password change");
+    throw new ApiError(401, "تم تغيير كلمة السر، فانتهت هذه الجلسة. سجّل الدخول من جديد.");
   }
 
   req.user = {

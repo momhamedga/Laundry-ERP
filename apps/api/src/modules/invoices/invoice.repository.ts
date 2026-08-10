@@ -186,7 +186,7 @@ export class InvoicesRepository {
         if (!isCollision || attempt === INVOICE_NUMBER_MAX_RETRIES) throw err;
       }
     }
-    throw new ApiError(409, "Could not allocate invoice number. Please retry");
+    throw new ApiError(409, "تعذّر حجز رقم فاتورة. أعد المحاولة.");
   }
 
   // ==================== Update (Atomic) ====================

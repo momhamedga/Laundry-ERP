@@ -28,14 +28,14 @@ export class UsersService {
 
   private async getUserOrFail(id: string): Promise<User> {
     const user = await this.repo.findById(id);
-    if (!user) throw new ApiError(404, "User not found");
+    if (!user) throw new ApiError(404, "المستخدم غير موجود.");
     return user;
   }
 
   private async ensureEmailAvailable(email: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByEmail(email);
     if (existing && existing.id !== excludeId) {
-      throw new ApiError(409, "Email is already in use");
+      throw new ApiError(409, "البريد الإلكتروني مستخدم بالفعل.");
     }
   }
 
@@ -44,7 +44,7 @@ export class UsersService {
     if (user.role !== "ADMIN" || !user.isActive) return;
     const others = await this.repo.countOtherActiveAdmins(user.id);
     if (others === 0) {
-      throw new ApiError(400, "Cannot modify the last active admin");
+      throw new ApiError(400, "لا يمكن تعديل آخر مدير نظام نشط.");
     }
   }
 
@@ -135,7 +135,7 @@ export class UsersService {
    */
   async softDelete(id: string, actorId: string): Promise<void> {
     if (id === actorId) {
-      throw new ApiError(400, "You cannot delete your own account");
+      throw new ApiError(400, "لا يمكنك حذف حسابك الخاص.");
     }
     const user = await this.getUserOrFail(id);
     await this.ensureNotLastActiveAdmin(user);
@@ -148,7 +148,7 @@ export class UsersService {
 
   async changeStatus(id: string, isActive: boolean, actorId: string): Promise<SafeUser> {
     if (id === actorId) {
-      throw new ApiError(400, "You cannot change your own status");
+      throw new ApiError(400, "لا يمكنك تغيير حالة حسابك الخاص.");
     }
     const user = await this.getUserOrFail(id);
 
@@ -173,7 +173,7 @@ export class UsersService {
 
   async assignRole(id: string, role: UserRole, actorId: string): Promise<SafeUser> {
     if (id === actorId) {
-      throw new ApiError(400, "You cannot change your own role");
+      throw new ApiError(400, "لا يمكنك تغيير دور حسابك الخاص.");
     }
     const user = await this.getUserOrFail(id);
 
@@ -222,7 +222,7 @@ export class UsersService {
    * TODO(cloudinary): رفع الصورة إلى Cloudinary وحفظ avatarUrl
    */
   uploadAvatar(): never {
-    throw new ApiError(501, "Avatar upload will be available when Cloudinary is configured");
+    throw new ApiError(501, "رفع الصورة الشخصية سيتاح بعد ضبط خدمة الصور.");
   }
 
   // ==================== Activity History ====================

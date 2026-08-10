@@ -104,7 +104,7 @@ describe("concurrency + security (integration)", () => {
     it("does not leak whether an email exists on failed login (uniform 401)", async () => {
       const unknown = await api(app).post("/api/v1/auth/login").send({ email: "ghost-x@test.local", password: "WhateverPass1" });
       expect(unknown.status).toBe(401);
-      expect(unknown.body.message).toMatch(/invalid email or password/i);
+      expect(unknown.body.message).toBe("البريد الإلكتروني أو كلمة السر غير صحيحة.");
     });
 
     it("blocks cross-tenant data mutation without the required permission (WORKER cannot create a customer)", async () => {

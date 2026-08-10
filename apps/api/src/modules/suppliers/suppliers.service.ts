@@ -21,7 +21,7 @@ export class SuppliersService {
 
   private async getOrFail(id: string): Promise<Supplier> {
     const supplier = await this.repo.findById(id);
-    if (!supplier) throw new ApiError(404, "Supplier not found");
+    if (!supplier) throw new ApiError(404, "المورّد غير موجود.");
     return supplier;
   }
 
@@ -85,14 +85,14 @@ export class SuppliersService {
   /** تعطيل (Soft Delete) - لا حذف فعلي (المشتريات مرتبطة بـ Restrict) */
   async disable(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const supplier = await this.getOrFail(id);
-    if (!supplier.isActive) throw new ApiError(400, "Supplier is already disabled");
+    if (!supplier.isActive) throw new ApiError(400, "المورّد موقوف بالفعل.");
     await this.repo.update(id, { isActive: false });
     await this.audit("SUPPLIER_DELETED", actor, ctx, { supplierId: id });
   }
 
   async restore(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<Supplier> {
     const supplier = await this.getOrFail(id);
-    if (supplier.isActive) throw new ApiError(400, "Supplier is already active");
+    if (supplier.isActive) throw new ApiError(400, "المورّد نشط بالفعل.");
     const updated = await this.repo.update(id, { isActive: true });
     await this.audit("SUPPLIER_UPDATED", actor, ctx, { supplierId: id, restored: true });
     return updated;

@@ -55,14 +55,14 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
     });
 
     if (!isAccessPayload(decoded)) {
-      throw new ApiError(401, "Invalid token payload");
+      throw new ApiError(401, "بيانات الجلسة غير صالحة. سجّل الدخول من جديد.");
     }
     return decoded;
   } catch (err) {
     if (err instanceof ApiError) throw err;
     if (err instanceof jwt.TokenExpiredError) {
-      throw new ApiError(401, "Access token expired");
+      throw new ApiError(401, "انتهت صلاحية الجلسة. سجّل الدخول من جديد.");
     }
-    throw new ApiError(401, "Invalid access token");
+    throw new ApiError(401, "جلسة غير صالحة. سجّل الدخول من جديد.");
   }
 }

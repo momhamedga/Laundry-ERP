@@ -18,13 +18,13 @@ export class PurchasesService {
 
   private async getOrFail(id: string): Promise<Purchase> {
     const purchase = await this.repo.findBasic(id);
-    if (!purchase) throw new ApiError(404, "Purchase not found");
+    if (!purchase) throw new ApiError(404, "أمر الشراء غير موجود.");
     return purchase;
   }
 
   private async getDetailOrFail(id: string): Promise<PurchaseDetail> {
     const detail = await this.repo.findDetail(id);
-    if (!detail) throw new ApiError(404, "Purchase not found");
+    if (!detail) throw new ApiError(404, "أمر الشراء غير موجود.");
     return detail;
   }
 
@@ -73,7 +73,7 @@ export class PurchasesService {
   ): Promise<PurchaseDetail> {
     const purchase = await this.getOrFail(id);
     if (purchase.status !== "DRAFT") {
-      throw new ApiError(409, "Only DRAFT purchases can be edited");
+      throw new ApiError(409, "لا يمكن تعديل أمر شراء إلا وهو في حالة مسودة.");
     }
     // إن لم تُرسَل البنود/الضريبة، نُبقي القيم الحالية
     const items = dto.items ?? (await this.getDetailOrFail(id)).items.map((i) => ({
@@ -108,7 +108,7 @@ export class PurchasesService {
   async remove(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const purchase = await this.getOrFail(id);
     if (purchase.status !== "DRAFT") {
-      throw new ApiError(409, "Only DRAFT purchases can be deleted");
+      throw new ApiError(409, "لا يمكن حذف أمر شراء إلا وهو في حالة مسودة.");
     }
     await this.repo.deleteDraft(id);
     await this.audit("PURCHASE_DELETED", actor, ctx, { purchaseId: id, purchaseNumber: purchase.purchaseNumber });
@@ -117,8 +117,8 @@ export class PurchasesService {
   /** استلام: يزيد المخزون (حركات IN) + PURCHASE_RECEIVED + إعادة تقييم التنبيهات */
   async receive(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<PurchaseDetail> {
     const purchase = await this.getOrFail(id);
-    if (purchase.status === "RECEIVED") throw new ApiError(409, "Purchase already received");
-    if (purchase.status === "CANCELLED") throw new ApiError(409, "Cannot receive a cancelled purchase");
+    if (purchase.status === "RECEIVED") throw new ApiError(409, "أمر الشراء مستلَم بالفعل.");
+    if (purchase.status === "CANCELLED") throw new ApiError(409, "لا يمكن استلام أمر شراء ملغي.");
 
     const { purchase: received, itemIds } = await this.repo.receive(id, actor.id);
 
@@ -144,9 +144,9 @@ export class PurchasesService {
   async cancel(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<Purchase> {
     const purchase = await this.getOrFail(id);
     if (purchase.status === "RECEIVED") {
-      throw new ApiError(409, "Cannot cancel a received purchase");
+      throw new ApiError(409, "لا يمكن إلغاء أمر شراء تم استلامه.");
     }
-    if (purchase.status === "CANCELLED") throw new ApiError(409, "Purchase already cancelled");
+    if (purchase.status === "CANCELLED") throw new ApiError(409, "أمر الشراء ملغي بالفعل.");
 
     const cancelled = await this.repo.updateStatus(id, { status: "CANCELLED" });
     const detail = await this.getDetailOrFail(id);

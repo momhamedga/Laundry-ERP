@@ -34,7 +34,7 @@ export class InventoryService {
 
   private async getItemOrFail(id: string): Promise<InventoryItem> {
     const item = await this.repo.findItemById(id);
-    if (!item) throw new ApiError(404, "Inventory item not found");
+    if (!item) throw new ApiError(404, "الصنف غير موجود في المخزون.");
     return item;
   }
 
@@ -65,7 +65,7 @@ export class InventoryService {
     ctx: RequestContext,
   ): Promise<InventoryItem> {
     const existing = await this.repo.findItemBySku(dto.sku);
-    if (existing) throw new ApiError(409, "SKU already exists");
+    if (existing) throw new ApiError(409, "رمز الصنف (SKU) موجود بالفعل.");
 
     const item = await this.repo.createItemWithOpening(
       {
@@ -123,14 +123,14 @@ export class InventoryService {
 
   async softDelete(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const item = await this.getItemOrFail(id);
-    if (!item.isActive) throw new ApiError(400, "Item is already deactivated");
+    if (!item.isActive) throw new ApiError(400, "الصنف موقوف بالفعل.");
     await this.repo.updateItem(id, { isActive: false });
     await this.audit("INVENTORY_ITEM_DELETED", actor, ctx, { itemId: id, sku: item.sku });
   }
 
   async restore(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<InventoryItem> {
     const item = await this.getItemOrFail(id);
-    if (item.isActive) throw new ApiError(400, "Item is already active");
+    if (item.isActive) throw new ApiError(400, "الصنف نشط بالفعل.");
     const updated = await this.repo.updateItem(id, { isActive: true });
     await this.audit("INVENTORY_ITEM_UPDATED", actor, ctx, { itemId: id, restored: true });
     return updated;
@@ -272,7 +272,7 @@ export class InventoryService {
           where: { id: line.itemId },
           select: { quantity: true },
         });
-        if (!item) throw new ApiError(404, `Item ${line.itemId} not found`);
+        if (!item) throw new ApiError(404, `الصنف غير موجود (${line.itemId}).`);
         const systemQty = Number(item.quantity);
         const diff = line.countedQuantity - systemQty;
 
@@ -340,8 +340,8 @@ export class InventoryService {
 
   async resolveAlert(id: string): Promise<void> {
     const alert = await this.repo.findAlertById(id);
-    if (!alert) throw new ApiError(404, "Alert not found");
-    if (alert.status === "RESOLVED") throw new ApiError(400, "Alert already resolved");
+    if (!alert) throw new ApiError(404, "التنبيه غير موجود.");
+    if (alert.status === "RESOLVED") throw new ApiError(400, "التنبيه معالَج بالفعل.");
     await this.repo.resolveAlert(id);
   }
 

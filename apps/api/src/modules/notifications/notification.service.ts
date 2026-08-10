@@ -239,7 +239,7 @@ export class NotificationService {
 
   async getById(userId: string, id: string): Promise<NotificationRow> {
     const notification = await this.repo.findByIdForUser(id, userId);
-    if (!notification) throw new ApiError(404, "Notification not found");
+    if (!notification) throw new ApiError(404, "الإشعار غير موجود.");
     return notification;
   }
 
@@ -249,12 +249,12 @@ export class NotificationService {
 
   async markRead(userId: string, id: string): Promise<void> {
     const result = await this.repo.markRead(id, userId);
-    if (result.count === 0) throw new ApiError(404, "Notification not found");
+    if (result.count === 0) throw new ApiError(404, "الإشعار غير موجود.");
   }
 
   async markUnread(userId: string, id: string): Promise<void> {
     const result = await this.repo.markUnread(id, userId);
-    if (result.count === 0) throw new ApiError(404, "Notification not found");
+    if (result.count === 0) throw new ApiError(404, "الإشعار غير موجود.");
   }
 
   async markAllRead(userId: string): Promise<void> {
@@ -263,17 +263,17 @@ export class NotificationService {
 
   async archive(userId: string, id: string): Promise<void> {
     const result = await this.repo.archive(id, userId);
-    if (result.count === 0) throw new ApiError(404, "Notification not found");
+    if (result.count === 0) throw new ApiError(404, "الإشعار غير موجود.");
   }
 
   async unarchive(userId: string, id: string): Promise<void> {
     const result = await this.repo.unarchive(id, userId);
-    if (result.count === 0) throw new ApiError(404, "Notification not found");
+    if (result.count === 0) throw new ApiError(404, "الإشعار غير موجود.");
   }
 
   async delete(userId: string, id: string): Promise<void> {
     const result = await this.repo.delete(id, userId);
-    if (result.count === 0) throw new ApiError(404, "Notification not found");
+    if (result.count === 0) throw new ApiError(404, "الإشعار غير موجود.");
   }
 
   async bulkAction(userId: string, dto: BulkActionDto): Promise<{ affected: number }> {
@@ -388,7 +388,7 @@ export class NotificationService {
     if (merged.quietHoursEnabled && (!merged.quietHoursStart || !merged.quietHoursEnd)) {
       throw new ApiError(
         400,
-        "quietHoursStart and quietHoursEnd are required when quietHoursEnabled is true",
+        "عند تفعيل ساعات الهدوء يلزم تحديد وقت البداية ووقت النهاية.",
       );
     }
 
@@ -411,7 +411,7 @@ export class NotificationService {
     const content = buildNotificationContent({ type: "TEST", data: {}, targetUserId: userId });
 
     if (!settings.globalInApp) {
-      throw new ApiError(400, "In-App notifications are globally disabled for this account");
+      throw new ApiError(400, "إشعارات التطبيق معطَّلة كلياً لهذا الحساب.");
     }
 
     const externalChannels: NotificationChannel[] = settings.globalEmail ? ["EMAIL"] : [];
@@ -453,7 +453,7 @@ export class NotificationService {
     if (olderThanDays < MIN_CLEANUP_DAYS || olderThanDays > MAX_CLEANUP_DAYS) {
       throw new ApiError(
         400,
-        `olderThanDays must be between ${MIN_CLEANUP_DAYS} and ${MAX_CLEANUP_DAYS}`,
+        `عدد الأيام يجب أن يكون بين ${MIN_CLEANUP_DAYS} و${MAX_CLEANUP_DAYS}.`,
       );
     }
     const deleted = await this.repo.deleteOlderThan(olderThanDays);

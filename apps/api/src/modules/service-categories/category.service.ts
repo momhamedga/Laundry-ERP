@@ -22,14 +22,14 @@ export class CategoryService {
 
   private async getCategoryOrFail(id: string): Promise<CategoryWithCount> {
     const category = await this.repo.findById(id);
-    if (!category) throw new ApiError(404, "Category not found");
+    if (!category) throw new ApiError(404, "التصنيف غير موجود.");
     return toCategoryWithCount(category);
   }
 
   private async ensureNameAvailable(name: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByName(name);
     if (existing && existing.id !== excludeId) {
-      throw new ApiError(409, "Category name is already in use");
+      throw new ApiError(409, "اسم التصنيف مستخدم بالفعل.");
     }
   }
 
@@ -83,7 +83,7 @@ export class CategoryService {
   async changeStatus(id: string, isActive: boolean): Promise<ServiceCategory> {
     const category = await this.getCategoryOrFail(id);
     if (category.isActive === isActive) {
-      throw new ApiError(400, `Category is already ${isActive ? "active" : "inactive"}`);
+      throw new ApiError(400, `التصنيف ${isActive ? "نشط" : "موقوف"} بالفعل.`);
     }
     return this.repo.update(id, { isActive });
   }
@@ -101,7 +101,7 @@ export class CategoryService {
     if (servicesCount > 0) {
       throw new ApiError(
         409,
-        `Cannot delete category with ${servicesCount} service(s). Disable it instead`,
+        `لا يمكن حذف تصنيف يضمّ ${servicesCount} خدمة. أوقفه بدلاً من حذفه.`,
       );
     }
     await this.repo.hardDelete(id);

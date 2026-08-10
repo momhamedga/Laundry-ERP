@@ -11,11 +11,11 @@ import { ApiError } from "./error.middleware.js";
 export function requireRole(...roles: readonly UserRole[]): RequestHandler {
   return (req, _res, next): void => {
     if (!req.user) {
-      next(new ApiError(401, "Authentication required"));
+      next(new ApiError(401, "يلزم تسجيل الدخول للمتابعة."));
       return;
     }
     if (!roles.includes(req.user.role)) {
-      next(new ApiError(403, "Insufficient role privileges"));
+      next(new ApiError(403, "صلاحيات دورك لا تسمح بهذا الإجراء."));
       return;
     }
     next();

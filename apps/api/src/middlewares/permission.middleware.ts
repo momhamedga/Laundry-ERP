@@ -14,7 +14,7 @@ import { ApiError } from "./error.middleware.js";
 export function requirePermission(...required: readonly Permission[]): RequestHandler {
   return (req, _res, next): void => {
     if (!req.user) {
-      next(new ApiError(401, "Authentication required"));
+      next(new ApiError(401, "يلزم تسجيل الدخول للمتابعة."));
       return;
     }
 
@@ -24,7 +24,12 @@ export function requirePermission(...required: readonly Permission[]): RequestHa
     const missing = required.filter((p) => !granted.includes(p));
 
     if (missing.length > 0) {
-      next(new ApiError(403, `Missing permissions: ${missing.join(", ")}`));
+      // أسماء الصلاحيات معرّفات داخلية لا تفيد الموظّف وتكشف بنية النظام لمن
+      // يستكشفه. تبقى في السجلّ للتشخيص، ويرى المستخدم سبباً مفهوماً فقط.
+      console.warn(
+        `⛔ صلاحيات ناقصة للمستخدم ${req.user.id}: ${missing.join(", ")}`,
+      );
+      next(new ApiError(403, "لا تملك صلاحية تنفيذ هذا الإجراء."));
       return;
     }
     next();

@@ -31,13 +31,13 @@ export class CouponsService {
   }
   async getById(id: string): Promise<Coupon> {
     const coupon = await this.repo.findById(id);
-    if (!coupon) throw new ApiError(404, "Coupon not found");
+    if (!coupon) throw new ApiError(404, "الكوبون غير موجود.");
     return coupon;
   }
 
   async create(dto: CreateCouponDto, actor: AuthenticatedUser, ctx: RequestContext): Promise<Coupon> {
     const existing = await this.repo.findByCode(dto.code);
-    if (existing) throw new ApiError(409, "Coupon code already exists");
+    if (existing) throw new ApiError(409, "كود الكوبون موجود بالفعل.");
     const coupon = await this.repo.create({
       code: dto.code,
       description: dto.description ?? null,

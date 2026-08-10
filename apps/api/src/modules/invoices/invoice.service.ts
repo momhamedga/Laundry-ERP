@@ -129,14 +129,17 @@ export class InvoicesService {
 
   private async getInvoiceOrFail(id: string): Promise<InvoiceDetail> {
     const invoice = await this.repo.findById(id);
-    if (!invoice) throw new ApiError(404, "Invoice not found");
+    if (!invoice) throw new ApiError(404, "الفاتورة غير موجودة.");
     return this.attachDerived(invoice);
   }
 
   /** Business Rule: لا تعديل لفاتورة ملغاة - حالة نهائية */
   private ensureMutable(invoice: InvoiceDetail): void {
     if (TERMINAL_STATUSES.includes(invoice.status)) {
-      throw new ApiError(400, `Invoice is ${invoice.status} and can no longer be modified`);
+      throw new ApiError(
+        400,
+        `لا يمكن تعديل الفاتورة بعد أن أصبحت حالتها «${INVOICE_STATUS_LABELS[invoice.status]}».`,
+      );
     }
   }
 
@@ -183,17 +186,17 @@ export class InvoicesService {
 
   async create(dto: CreateInvoiceDto, actor: AuthenticatedUser): Promise<InvoiceDetail> {
     const order = await this.repo.findOrderForInvoice(dto.orderId);
-    if (!order) throw new ApiError(404, "Order not found");
+    if (!order) throw new ApiError(404, "الطلب غير موجود.");
 
     // Business Rule: لا فاتورة لطلب ملغي
     if (order.status === "CANCELLED") {
-      throw new ApiError(400, "Cannot issue an invoice for a cancelled order");
+      throw new ApiError(400, "لا يمكن إصدار فاتورة لطلب ملغي.");
     }
 
     // Business Rule: فاتورة واحدة لكل طلب (orderId فريد بالـSchema أيضاً - خط دفاع أخير)
     const existing = await this.repo.findByOrderId(dto.orderId);
     if (existing) {
-      throw new ApiError(409, `Order already has an invoice (${existing.invoiceNumber})`);
+      throw new ApiError(409, `للطلب فاتورة صادرة بالفعل (${existing.invoiceNumber}).`);
     }
 
     const totals = this.snapshotFromOrder(order, dto.tax);
@@ -254,7 +257,7 @@ export class InvoicesService {
 
   async getByNumber(invoiceNumber: string): Promise<InvoiceDetail> {
     const invoice = await this.repo.findByNumber(invoiceNumber);
-    if (!invoice) throw new ApiError(404, "Invoice not found");
+    if (!invoice) throw new ApiError(404, "الفاتورة غير موجودة.");
     return this.attachDerived(invoice);
   }
 
@@ -269,7 +272,7 @@ export class InvoicesService {
     if (dto.status === "DRAFT" && invoice.status !== "DRAFT" && invoice.paidAmount.gt(0)) {
       throw new ApiError(
         400,
-        "Cannot revert invoice to Draft: invoice already has recorded payments",
+        "لا يمكن إرجاع الفاتورة إلى مسودة بعد تسجيل دفعات عليها.",
       );
     }
 
@@ -318,7 +321,7 @@ export class InvoicesService {
 
     // Business Rule: لا حذف لفاتورة مدفوعة بالكامل - سجل مالي مكتمل (Cancel بدلاً منه)
     if (invoice.status === "PAID") {
-      throw new ApiError(400, "Cannot delete a fully paid invoice. Cancel it instead");
+      throw new ApiError(400, "لا يمكن حذف فاتورة مدفوعة بالكامل. ألغِها بدلاً من حذفها.");
     }
 
     await this.repo.deleteInvoice(id, actor.id, {
@@ -338,7 +341,7 @@ export class InvoicesService {
    */
   private ensureFinalized(invoice: InvoiceDetail): void {
     if (invoice.status === "DRAFT") {
-      throw new ApiError(400, "Cannot generate documents for a draft invoice. Issue it first");
+      throw new ApiError(400, "لا يمكن إصدار مستندات لفاتورة مسودة. أصدِر الفاتورة أولاً.");
     }
   }
 
@@ -458,7 +461,7 @@ export class InvoicesService {
     query: ListInvoicePaymentsQuery,
   ): Promise<ListInvoicePaymentsResult> {
     const invoice = await this.repo.findById(invoiceId);
-    if (!invoice) throw new ApiError(404, "Invoice not found");
+    if (!invoice) throw new ApiError(404, "الفاتورة غير موجودة.");
 
     const { skip, take } = this.toSkipTake(query.page, query.limit);
     const [payments, total] = await this.paymentsRepo.findManyWithCount(
@@ -487,17 +490,17 @@ export class InvoicesService {
       const ptx = new PaymentsTxRepository(tx);
 
       const invoice = await this.repo.findPaymentStateFieldsTx(tx, invoiceId);
-      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (!invoice) throw new ApiError(404, "الفاتورة غير موجودة.");
 
       // Business Rule: لا دفعة لفاتورة ملغاة
       if (invoice.status === "CANCELLED") {
-        throw new ApiError(400, "Cannot record a payment for a cancelled invoice");
+        throw new ApiError(400, "لا يمكن تسجيل دفعة على فاتورة ملغاة.");
       }
 
       const order = await ptx.findOrderById(invoice.orderId);
-      if (!order) throw new ApiError(404, "Order not found");
+      if (!order) throw new ApiError(404, "الطلب غير موجود.");
       if (order.status === "CANCELLED") {
-        throw new ApiError(400, "Cannot record a payment for a cancelled order");
+        throw new ApiError(400, "لا يمكن تسجيل دفعة على طلب ملغي.");
       }
 
       // Business Rule: السقف = إجمالي الفاتورة (بالضريبة) - يمنع الدفع الزائد
@@ -507,7 +510,7 @@ export class InvoicesService {
       if (committed.gt(invoice.total)) {
         throw new ApiError(
           400,
-          `Payment would exceed invoice total: ${committed.toFixed(2)} > ${invoice.total.toFixed(2)}`,
+          `المبلغ يتجاوز إجمالي الفاتورة: ${committed.toFixed(2)} مقابل ${invoice.total.toFixed(2)}.`,
         );
       }
 
@@ -557,7 +560,7 @@ export class InvoicesService {
       });
 
       const full = await ptx.findPaymentById(payment.id);
-      if (!full) throw new ApiError(500, "Failed to load created payment");
+      if (!full) throw new ApiError(500, "تعذّر تحميل الدفعة بعد إنشائها.");
       return full;
     });
 

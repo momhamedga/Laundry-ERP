@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Building2, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
@@ -29,6 +30,7 @@ import {
 } from "@/lib/validations/order";
 import { formatCurrency } from "@/lib/format";
 import { METHOD_LABELS } from "@/components/payments/payment-method-badge";
+import { useAuthStore } from "@/store/auth-store";
 import { selectOrderDraftTotals, useOrderDraftStore } from "@/store/order-draft-store";
 import type { OrderDetail } from "@/types/orders";
 import type { PaymentMethod } from "@/types/payment";
@@ -63,10 +65,29 @@ export function ReviewStep({ onBack, onCancel, onSuccess }: ReviewStepProps) {
   const { grandTotal: netItemsTotal } = selectOrderDraftTotals(items);
   const mutation = useCreateOrderMutation();
   const paymentMutation = useCreatePaymentMutation();
-  // الخادم يشتق الفرع من المستخدم الحالي؛ عند غيابه (كحساب Admin بلا فرع مُعيَّن)
-  // ولوجود فرع نشط واحد لا لبس فيه، نرسله صراحة بدل حقل اختيار جديد بالواجهة
-  const { data: branches } = useActiveBranchesQuery();
-  const fallbackBranchId = branches?.length === 1 ? branches[0].id : undefined;
+
+  /**
+   * الفرع: الخادم يشتقّه من حساب المنشئ، لكن حسابات الإشراف (مالك/مدير عام) بلا
+   * فرع مُعيَّن — فكان الطلب يُرفض بلا أي وسيلة أمام المستخدم لاختيار فرع.
+   *
+   * القاعدة السابقة «أرسِل الفرع فقط إن كان النشط واحداً» كانت تعالج حالة واحدة
+   * وتترك حالتَي الصفر والأكثر من واحد بلا حلّ. الآن: من له فرع لا يرى شيئاً
+   * (ولا يستطيع تحويل طلب لفرع آخر)، ومن لا فرع له يختار صراحةً.
+   */
+  const currentUser = useAuthStore((s) => s.user);
+  const needsBranchChoice = currentUser?.branchId == null;
+  const { data: branches, isLoading: branchesLoading } = useActiveBranchesQuery({
+    enabled: needsBranchChoice,
+  });
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+
+  // فرع نشط وحيد ⇒ لا معنى لسؤال المستخدم، نختاره عنه ونعرضه للعلم فقط
+  const soleBranchId = branches?.length === 1 ? branches[0].id : undefined;
+  const branchId = needsBranchChoice
+    ? (soleBranchId ?? (selectedBranchId === "" ? undefined : selectedBranchId))
+    : undefined;
+  const noActiveBranch = needsBranchChoice && !branchesLoading && branches?.length === 0;
+  const branchMissing = needsBranchChoice && !branchId;
 
   const {
     register,
@@ -91,10 +112,10 @@ export function ReviewStep({ onBack, onCancel, onSuccess }: ReviewStepProps) {
     netItemsTotal - (discount.trim() === "" ? 0 : Number(discount) || 0);
 
   async function onSubmit(values: OrderReviewFormValues) {
-    if (!customer) return;
+    if (!customer || branchMissing) return;
     try {
       const order = await mutation.mutateAsync(
-        toCreateOrderInput(values, customer.id, items, fallbackBranchId),
+        toCreateOrderInput(values, customer.id, items, branchId),
       );
 
       let paidAmount: number | undefined;
@@ -141,6 +162,48 @@ export function ReviewStep({ onBack, onCancel, onSuccess }: ReviewStepProps) {
           <h3 className="text-sm font-medium">الخدمات</h3>
           <ServiceSelectionStep />
         </section>
+
+        {needsBranchChoice && (
+          <section className="space-y-1.5">
+            <Label htmlFor="review-branch">الفرع *</Label>
+            {noActiveBranch ? (
+              <p
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+              >
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                لا يوجد فرع نشط في النظام. أنشئ فرعاً من صفحة «الفروع» قبل إنشاء الطلبات.
+              </p>
+            ) : soleBranchId ? (
+              <p className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+                <Building2 className="size-4 shrink-0" aria-hidden />
+                {branches?.[0].name}
+              </p>
+            ) : (
+              <Select
+                value={selectedBranchId}
+                onValueChange={(v) => setSelectedBranchId(v ?? "")}
+                items={Object.fromEntries((branches ?? []).map((b) => [b.id, b.name]))}
+              >
+                <SelectTrigger id="review-branch" className="w-full" aria-invalid={branchMissing}>
+                  <SelectValue placeholder={branchesLoading ? "جارٍ التحميل…" : "اختر الفرع"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(branches ?? []).map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {!noActiveBranch && !soleBranchId && (
+              <p className="text-xs text-muted-foreground">
+                حسابك يشرف على كل الفروع، فاختر الفرع الذي يُسجَّل عليه هذا الطلب.
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="space-y-1.5">
           <Label htmlFor="review-discount">خصم إضافي على الطلب (اختياري)</Label>
@@ -266,7 +329,7 @@ export function ReviewStep({ onBack, onCancel, onSuccess }: ReviewStepProps) {
             <ArrowRight aria-hidden /> رجوع
           </Button>
           {can("orders:create") && (
-            <Button type="submit" disabled={isPending || items.length === 0}>
+            <Button type="submit" disabled={isPending || items.length === 0 || branchMissing}>
               {isPending && <Spinner className="text-primary-foreground" />}
               إنشاء الطلب
             </Button>

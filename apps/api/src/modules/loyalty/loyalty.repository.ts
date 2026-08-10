@@ -66,7 +66,7 @@ export class LoyaltyRepository {
       account ??= await tx.loyaltyAccount.create({ data: { customerId: input.customerId } });
 
       const newCurrent = account.currentPoints + input.signedPoints;
-      if (newCurrent < 0) throw new ApiError(400, "Insufficient points balance");
+      if (newCurrent < 0) throw new ApiError(400, "رصيد النقاط غير كافٍ.");
 
       const updated = await tx.loyaltyAccount.update({
         where: { customerId: input.customerId },

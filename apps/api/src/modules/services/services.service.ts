@@ -21,13 +21,13 @@ export class ServicesService {
 
   private async getServiceOrFail(id: string): Promise<ServiceWithCategory> {
     const service = await this.repo.findById(id);
-    if (!service) throw new ApiError(404, "Service not found");
+    if (!service) throw new ApiError(404, "الخدمة غير موجودة.");
     return toServiceWithCategory(service);
   }
 
   private async ensureCategoryExists(categoryId: string): Promise<void> {
     const category = await this.repo.findCategoryById(categoryId);
-    if (!category) throw new ApiError(404, "Category not found");
+    if (!category) throw new ApiError(404, "التصنيف غير موجود.");
   }
 
   /** Business Rule: لا تكرار لاسم الخدمة داخل نفس التصنيف (مسموح عبر تصنيفات مختلفة) */
@@ -38,7 +38,7 @@ export class ServicesService {
   ): Promise<void> {
     const existing = await this.repo.findByNameInCategory(categoryId, name);
     if (existing && existing.id !== excludeId) {
-      throw new ApiError(409, "A service with this name already exists in this category");
+      throw new ApiError(409, "توجد خدمة بهذا الاسم في نفس التصنيف.");
     }
   }
 
@@ -50,7 +50,7 @@ export class ServicesService {
       query.maxPrice !== undefined &&
       query.minPrice > query.maxPrice
     ) {
-      throw new ApiError(400, "minPrice cannot be greater than maxPrice");
+      throw new ApiError(400, "الحد الأدنى للسعر لا يمكن أن يتجاوز الحد الأقصى.");
     }
 
     const { skip, take } = toSkipTake(query.page, query.limit);
@@ -127,7 +127,7 @@ export class ServicesService {
   async changeStatus(id: string, isActive: boolean): Promise<ServiceWithCategory> {
     const service = await this.getServiceOrFail(id);
     if (service.isActive === isActive) {
-      throw new ApiError(400, `Service is already ${isActive ? "active" : "inactive"}`);
+      throw new ApiError(400, `الخدمة ${isActive ? "نشطة" : "موقوفة"} بالفعل.`);
     }
     return toServiceWithCategory(await this.repo.update(id, { isActive }));
   }
@@ -139,7 +139,7 @@ export class ServicesService {
   async softDelete(id: string): Promise<void> {
     const service = await this.getServiceOrFail(id);
     if (!service.isActive) {
-      throw new ApiError(400, "Service is already deleted (inactive)");
+      throw new ApiError(400, "الخدمة محذوفة (غير نشطة) بالفعل.");
     }
     await this.repo.update(id, { isActive: false });
   }
@@ -147,7 +147,7 @@ export class ServicesService {
   async restore(id: string): Promise<ServiceWithCategory> {
     const service = await this.getServiceOrFail(id);
     if (service.isActive) {
-      throw new ApiError(400, "Service is already active");
+      throw new ApiError(400, "الخدمة نشطة بالفعل.");
     }
     return toServiceWithCategory(await this.repo.update(id, { isActive: true }));
   }
@@ -158,6 +158,6 @@ export class ServicesService {
    * TODO(cloudinary): رفع صورة الخدمة إلى Cloudinary وحفظ imageUrl
    */
   uploadImage(): never {
-    throw new ApiError(501, "Service image upload will be available when Cloudinary is configured");
+    throw new ApiError(501, "رفع صورة الخدمة سيتاح بعد ضبط خدمة الصور.");
   }
 }

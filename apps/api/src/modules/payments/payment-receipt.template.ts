@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PaymentTxStatus, SystemSettings } from "@prisma/client";
+import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
 import type { PaymentRow } from "./payments.types.js";
 
 /**
@@ -72,8 +73,9 @@ export function buildPaymentReceiptHtml(payment: PaymentRow, company: SystemSett
 <meta charset="utf-8" />
 <title>إيصال دفع ${escapeHtml(receiptRef)}</title>
 <style>
+  ${PDF_FONT_FACE_CSS}
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
+  body { font-family: ${PDF_FONT_STACK}; color: #0f172a; margin: 0; padding: 0; }
   .receipt { max-width: 480px; margin: 0 auto; }
   .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
   .header img { max-height: 48px; max-width: 140px; margin-bottom: 6px; }

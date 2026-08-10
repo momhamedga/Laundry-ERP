@@ -19,7 +19,7 @@ export class ApiError extends Error {
 export function notFoundHandler(req: Request, res: Response): void {
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    message: `المسار المطلوب غير موجود: ${req.method} ${req.originalUrl}`,
   });
 }
 
@@ -38,7 +38,7 @@ export function errorHandler(
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,
-      message: "Validation error",
+      message: "بيانات غير صالحة. راجع الحقول المُشار إليها.",
       errors: err.issues.map((i) => ({
         path: i.path.join("."),
         message: i.message,

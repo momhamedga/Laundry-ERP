@@ -31,7 +31,7 @@ import {
 } from "./barcode.validator.js";
 
 function requireUser(req: Request): AuthenticatedUser {
-  if (!req.user) throw new ApiError(401, "Authentication required");
+  if (!req.user) throw new ApiError(401, "يلزم تسجيل الدخول للمتابعة.");
   return req.user;
 }
 

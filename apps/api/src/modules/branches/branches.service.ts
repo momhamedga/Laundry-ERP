@@ -22,14 +22,14 @@ export class BranchesService {
 
   private async getBranchOrFail(id: string): Promise<BranchWithCounts> {
     const branch = await this.repo.findById(id);
-    if (!branch) throw new ApiError(404, "Branch not found");
+    if (!branch) throw new ApiError(404, "الفرع غير موجود.");
     return toBranchWithCounts(branch);
   }
 
   private async ensureNameAvailable(name: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByName(name);
     if (existing && existing.id !== excludeId) {
-      throw new ApiError(409, "Branch name is already in use");
+      throw new ApiError(409, "اسم الفرع مستخدم بالفعل.");
     }
   }
 
@@ -83,7 +83,7 @@ export class BranchesService {
   async changeStatus(id: string, isActive: boolean): Promise<Branch> {
     const branch = await this.getBranchOrFail(id);
     if (branch.isActive === isActive) {
-      throw new ApiError(400, `Branch is already ${isActive ? "active" : "inactive"}`);
+      throw new ApiError(400, `الفرع ${isActive ? "نشط" : "موقوف"} بالفعل.`);
     }
     return this.repo.update(id, { isActive });
   }
@@ -98,7 +98,7 @@ export class BranchesService {
     if (branch.usersCount > 0 || branch.ordersCount > 0) {
       throw new ApiError(
         409,
-        `Cannot delete branch with ${branch.usersCount} user(s) and ${branch.ordersCount} order(s). Disable it instead`,
+        `لا يمكن حذف فرع مرتبط بـ${branch.usersCount} مستخدم و${branch.ordersCount} طلب. أوقفه بدلاً من حذفه.`,
       );
     }
     await this.repo.hardDelete(id);

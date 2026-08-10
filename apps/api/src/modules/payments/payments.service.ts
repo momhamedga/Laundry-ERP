@@ -1,3 +1,4 @@
+import { PAYMENT_STATUS_AR } from "../../constants/status-labels.js";
 import { ApiError } from "../../middlewares/error.middleware.js";
 import { renderHtmlToPdf } from "../../lib/pdf.js";
 import type { AuthenticatedUser } from "../auth/index.js";
@@ -41,7 +42,7 @@ export class PaymentsService {
    */
   private async recomputeOrder(t: PaymentsTxRepository, orderId: string): Promise<void> {
     const order = await t.findOrderById(orderId);
-    if (!order) throw new ApiError(404, "Order not found");
+    if (!order) throw new ApiError(404, "الطلب غير موجود.");
 
     const sums = await t.getOrderPaymentSums(orderId);
     await t.updateOrderPaymentState(
@@ -56,7 +57,7 @@ export class PaymentsService {
     id: string,
   ): Promise<PaymentRow> {
     const payment = await t.findPaymentById(id);
-    if (!payment) throw new ApiError(404, "Payment not found");
+    if (!payment) throw new ApiError(404, "الدفعة غير موجودة.");
     return payment;
   }
 
@@ -70,11 +71,11 @@ export class PaymentsService {
     const payment = await this.repo.transaction(async (t) => {
       // Business Rule: لا دفعة لطلب غير موجود
       const order = await t.findOrderById(dto.orderId);
-      if (!order) throw new ApiError(404, "Order not found");
+      if (!order) throw new ApiError(404, "الطلب غير موجود.");
 
       // Business Rule: لا دفعة لطلب ملغي
       if (order.status === "CANCELLED") {
-        throw new ApiError(400, "Cannot record a payment for a cancelled order");
+        throw new ApiError(400, "لا يمكن تسجيل دفعة على طلب ملغي.");
       }
 
       // Business Rule: مجموع المدفوعات (محصل + معلق) لا يتجاوز إجمالي الطلب
@@ -84,7 +85,7 @@ export class PaymentsService {
       if (committed.gt(order.total)) {
         throw new ApiError(
           400,
-          `Payment would exceed order total: ${committed.toFixed(2)} > ${order.total.toFixed(2)}`,
+          `المبلغ يتجاوز إجمالي الطلب: ${committed.toFixed(2)} مقابل ${order.total.toFixed(2)}.`,
         );
       }
 
@@ -140,7 +141,7 @@ export class PaymentsService {
       query.maxAmount !== undefined &&
       query.minAmount > query.maxAmount
     ) {
-      throw new ApiError(400, "minAmount cannot be greater than maxAmount");
+      throw new ApiError(400, "الحد الأدنى للمبلغ لا يمكن أن يتجاوز الحد الأقصى.");
     }
 
     const { skip, take } = toSkipTake(query.page, query.limit);
@@ -156,7 +157,7 @@ export class PaymentsService {
 
   async getById(id: string): Promise<PaymentRow> {
     const payment = await this.repo.findById(id);
-    if (!payment) throw new ApiError(404, "Payment not found");
+    if (!payment) throw new ApiError(404, "الدفعة غير موجودة.");
     return payment;
   }
 
@@ -175,17 +176,20 @@ export class PaymentsService {
       if (payment.status === "COMPLETED" && !ALLOW_COMPLETED_PAYMENT_EDIT) {
         throw new ApiError(
           400,
-          "Completed payments are immutable by policy. Use refund and create a new payment",
+          "الدفعات المكتملة غير قابلة للتعديل. سجّل ردّ مبلغ ثم أنشئ دفعة جديدة.",
         );
       }
       if (payment.status !== "PENDING") {
-        throw new ApiError(400, `Cannot modify a ${payment.status} payment`);
+        throw new ApiError(
+          400,
+          `لا يمكن تعديل دفعة حالتها «${PAYMENT_STATUS_AR[payment.status]}».`,
+        );
       }
 
       // إعادة تحقق السقف عند تغيير المبلغ (باستبعاد مبلغ هذه الدفعة المعلق)
       if (dto.amount !== undefined) {
         const order = await t.findOrderById(payment.orderId);
-        if (!order) throw new ApiError(404, "Order not found");
+        if (!order) throw new ApiError(404, "الطلب غير موجود.");
 
         const sums = await t.getOrderPaymentSums(payment.orderId);
         const committed = sums.paidNet
@@ -195,7 +199,7 @@ export class PaymentsService {
         if (committed.gt(order.total)) {
           throw new ApiError(
             400,
-            `Payment would exceed order total: ${committed.toFixed(2)} > ${order.total.toFixed(2)}`,
+            `المبلغ يتجاوز إجمالي الطلب: ${committed.toFixed(2)} مقابل ${order.total.toFixed(2)}.`,
           );
         }
       }
@@ -235,10 +239,13 @@ export class PaymentsService {
       const payment = await this.getPaymentOrFail(t, id);
 
       if (payment.status === "REFUNDED") {
-        throw new ApiError(400, "Payment is already fully refunded");
+        throw new ApiError(400, "الدفعة مستردة بالكامل بالفعل.");
       }
       if (payment.status !== "COMPLETED") {
-        throw new ApiError(400, `Only completed payments can be refunded (status: ${payment.status})`);
+        throw new ApiError(
+          400,
+          `لا يُردّ المبلغ إلا لدفعة مكتملة، وحالة هذه الدفعة «${PAYMENT_STATUS_AR[payment.status]}».`,
+        );
       }
 
       // Business Rule: الاسترداد لا يتجاوز المتبقي من المدفوع
@@ -247,7 +254,7 @@ export class PaymentsService {
       if (refundAmount.gt(remaining)) {
         throw new ApiError(
           400,
-          `Refund exceeds refundable amount: ${refundAmount.toFixed(2)} > ${remaining.toFixed(2)}`,
+          `مبلغ الردّ يتجاوز المتاح للردّ: ${refundAmount.toFixed(2)} مقابل ${remaining.toFixed(2)}.`,
         );
       }
       refundAmountForNotification = refundAmount.toNumber();
@@ -352,12 +359,12 @@ export class PaymentsService {
    */
   private async loadReceiptContext(id: string): Promise<{ payment: PaymentRow; html: string }> {
     const payment = await this.repo.findById(id);
-    if (!payment) throw new ApiError(404, "Payment not found");
+    if (!payment) throw new ApiError(404, "الدفعة غير موجودة.");
 
     if (payment.status !== "COMPLETED" && payment.status !== "REFUNDED") {
       throw new ApiError(
         400,
-        `Cannot issue a receipt for a ${payment.status} payment (only completed/refunded)`,
+        `لا يُصدَر إيصال لدفعة حالتها «${PAYMENT_STATUS_AR[payment.status]}» — الإيصال للمكتملة والمستردة فقط.`,
       );
     }
 

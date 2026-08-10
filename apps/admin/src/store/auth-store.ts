@@ -163,7 +163,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({
       impersonator: original,
       accessToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatarUrl: null },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: null,
+        branchId: user.branchId,
+      },
     });
   },
 

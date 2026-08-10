@@ -27,7 +27,7 @@ export class CustomersService {
 
   private async getCustomerOrFail(id: string): Promise<Customer> {
     const customer = await this.repo.findById(id);
-    if (!customer) throw new ApiError(404, "Customer not found");
+    if (!customer) throw new ApiError(404, "العميل غير موجود.");
     return customer;
   }
 
@@ -35,7 +35,7 @@ export class CustomersService {
   private async ensurePhoneAvailable(phone: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByPhone(phone);
     if (existing && existing.id !== excludeId) {
-      throw new ApiError(409, "Phone number is already registered to another customer");
+      throw new ApiError(409, "رقم الهاتف مسجَّل بالفعل لعميل آخر.");
     }
   }
 
@@ -63,7 +63,7 @@ export class CustomersService {
   /** بحث سريع بالهاتف - يستفيد من الفهرس الفريد مباشرة */
   async getByPhone(phone: string): Promise<Customer> {
     const customer = await this.repo.findByPhone(phone);
-    if (!customer) throw new ApiError(404, "Customer not found");
+    if (!customer) throw new ApiError(404, "العميل غير موجود.");
     return customer;
   }
 
@@ -110,7 +110,7 @@ export class CustomersService {
   async softDelete(id: string): Promise<void> {
     const customer = await this.getCustomerOrFail(id);
     if (!customer.isActive) {
-      throw new ApiError(400, "Customer is already deactivated");
+      throw new ApiError(400, "العميل موقوف بالفعل.");
     }
     await this.repo.update(id, { isActive: false });
   }
@@ -118,7 +118,7 @@ export class CustomersService {
   async restore(id: string): Promise<Customer> {
     const customer = await this.getCustomerOrFail(id);
     if (customer.isActive) {
-      throw new ApiError(400, "Customer is already active");
+      throw new ApiError(400, "العميل نشط بالفعل.");
     }
     return this.repo.update(id, { isActive: true });
   }
@@ -131,7 +131,7 @@ export class CustomersService {
    * transaction واحدة، ثم تعطيل source وتوثيق الدمج في notes
    */
   merge(): never {
-    throw new ApiError(501, "Customer merge is not implemented yet");
+    throw new ApiError(501, "دمج العملاء غير متاح بعد.");
   }
 
   // ==================== Statistics / Profile ====================

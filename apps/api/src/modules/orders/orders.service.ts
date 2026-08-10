@@ -1,4 +1,5 @@
 import type { Service } from "@prisma/client";
+import { ORDER_STATUS_AR } from "../../constants/status-labels.js";
 import { ApiError } from "../../middlewares/error.middleware.js";
 import type { AuthenticatedUser } from "../auth/index.js";
 import { notificationBus } from "../notifications/index.js";
@@ -34,22 +35,25 @@ export class OrdersService {
 
   private async getOrderOrFail(id: string): Promise<OrderDetail> {
     const order = await this.repo.findById(id);
-    if (!order) throw new ApiError(404, "Order not found");
+    if (!order) throw new ApiError(404, "الطلب غير موجود.");
     return order;
   }
 
   /** Business Rule: يمنع التعديل بعد DELIVERED أو CANCELLED */
   private ensureMutable(order: OrderDetail): void {
     if (isTerminal(order.status)) {
-      throw new ApiError(400, `Order is ${order.status} and can no longer be modified`);
+      throw new ApiError(
+        400,
+        `لا يمكن تعديل الطلب بعد أن أصبحت حالته «${ORDER_STATUS_AR[order.status]}».`,
+      );
     }
   }
 
   /** Business Rule: لا طلب بدون عميل موجود ونشط */
   private async resolveCustomer(customerId: string): Promise<void> {
     const customer = await this.repo.findCustomerById(customerId);
-    if (!customer) throw new ApiError(404, "Customer not found");
-    if (!customer.isActive) throw new ApiError(400, "Customer account is deactivated");
+    if (!customer) throw new ApiError(404, "العميل غير موجود.");
+    if (!customer.isActive) throw new ApiError(400, "حساب العميل موقوف.");
   }
 
   /** الفرع من الطلب أو من حساب المنشئ */
@@ -59,11 +63,11 @@ export class OrdersService {
   ): Promise<string> {
     const branchId = dtoBranchId ?? actor.branchId;
     if (!branchId) {
-      throw new ApiError(400, "branchId is required (user has no assigned branch)");
+      throw new ApiError(400, "حسابك غير مرتبط بأي فرع. اختر فرعاً للطلب، أو اطلب من المسؤول تعيين فرع لحسابك.");
     }
     const branch = await this.repo.findBranchById(branchId);
-    if (!branch) throw new ApiError(404, "Branch not found");
-    if (!branch.isActive) throw new ApiError(400, "Branch is inactive");
+    if (!branch) throw new ApiError(404, "الفرع غير موجود.");
+    if (!branch.isActive) throw new ApiError(400, "الفرع غير نشط.");
     return branchId;
   }
 
@@ -80,14 +84,14 @@ export class OrdersService {
 
     for (const id of ids) {
       const service = byId.get(id);
-      if (!service) throw new ApiError(404, `Service not found: ${id}`);
+      if (!service) throw new ApiError(404, `الخدمة غير موجودة (${id}).`);
       if (!service.isActive) {
-        throw new ApiError(400, `Service "${service.name}" is inactive`);
+        throw new ApiError(400, `الخدمة «${service.name}» غير مفعّلة.`);
       }
       if (!service.category.isActive) {
         throw new ApiError(
           400,
-          `Service "${service.name}" belongs to a disabled category (${service.category.name})`,
+          `الخدمة «${service.name}» تتبع تصنيفاً معطَّلاً (${service.category.name}).`,
         );
       }
     }
@@ -150,7 +154,7 @@ export class OrdersService {
 
   async getByNumber(orderNumber: string): Promise<OrderDetail> {
     const order = await this.repo.findByNumber(orderNumber);
-    if (!order) throw new ApiError(404, "Order not found");
+    if (!order) throw new ApiError(404, "الطلب غير موجود.");
     return order;
   }
 
@@ -167,7 +171,7 @@ export class OrdersService {
 
     // dueDate الجديد يجب أن يبقى بعد receivedAt الثابت
     if (dto.dueDate !== undefined && dto.dueDate.getTime() <= order.receivedAt.getTime()) {
-      throw new ApiError(400, "dueDate must be after receivedAt");
+      throw new ApiError(400, "تاريخ التسليم يجب أن يكون بعد تاريخ الاستلام.");
     }
 
     // إعادة حساب الإجماليات عند تغيير العناصر أو الخصم - بالخادم فقط
@@ -219,7 +223,7 @@ export class OrdersService {
     if (!canTransition(order.status, dto.status)) {
       throw new ApiError(
         400,
-        `Cannot transition from ${order.status} to ${dto.status}`,
+        `لا يمكن نقل الطلب من «${ORDER_STATUS_AR[order.status]}» إلى «${ORDER_STATUS_AR[dto.status]}».`,
       );
     }
 

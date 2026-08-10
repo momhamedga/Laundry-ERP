@@ -38,7 +38,7 @@ export class LoyaltyService {
 
   async getSummary(customerId: string): Promise<AccountSummary> {
     const account = await this.repo.findAccountWithCustomer(customerId);
-    if (!account) throw new ApiError(404, "Customer has no loyalty account yet");
+    if (!account) throw new ApiError(404, "لا يوجد حساب ولاء لهذا العميل بعد.");
     return {
       customerId,
       customerName: account.customer.name,
@@ -173,10 +173,11 @@ export class LoyaltyService {
 
   async redeem(dto: RedeemDto, actor: AuthenticatedUser, ctx: RequestContext): Promise<RedeemResult> {
     const account = await this.repo.findAccountWithCustomer(dto.customerId);
-    if (!account) throw new ApiError(404, "Customer has no loyalty account");
+    if (!account) throw new ApiError(404, "لا يوجد حساب ولاء لهذا العميل.");
     const settings = await this.repo.getOrCreateSettings();
-    if (dto.points < settings.minPointsToRedeem) throw new ApiError(400, `Minimum ${settings.minPointsToRedeem} points to redeem`);
-    if (dto.points > account.currentPoints) throw new ApiError(400, "Insufficient points");
+    if (dto.points < settings.minPointsToRedeem)
+      throw new ApiError(400, `الحد الأدنى للاستبدال ${settings.minPointsToRedeem} نقطة.`);
+    if (dto.points > account.currentPoints) throw new ApiError(400, "النقاط غير كافية.");
 
     const discountAmount = Number((dto.points * Number(settings.redeemValue)).toFixed(2));
     const { account: updated } = await this.repo.applyLedger({
@@ -227,7 +228,7 @@ export class LoyaltyService {
       BONUS: 0,
     };
     const points = dto.points ?? defaults[dto.type] ?? 0;
-    if (points <= 0) throw new ApiError(400, "Bonus points must be positive (set in settings or provide explicitly)");
+    if (points <= 0) throw new ApiError(400, "نقاط المكافأة يجب أن تكون أكبر من صفر. اضبطها في الإعدادات أو مرِّرها صراحةً.");
 
     const account = await this.repo.findAccountWithCustomer(dto.customerId);
     const { account: updated } = await this.repo.applyLedger({
@@ -306,14 +307,14 @@ export class LoyaltyService {
   }
   async updateCampaign(id: string, dto: UpdateCampaignDto, actor: AuthenticatedUser, ctx: RequestContext): Promise<Campaign> {
     const existing = await this.repo.findCampaign(id);
-    if (!existing) throw new ApiError(404, "Campaign not found");
+    if (!existing) throw new ApiError(404, "الحملة غير موجودة.");
     const campaign = await this.repo.updateCampaign(id, dto);
     await this.audit("CAMPAIGN_UPDATED", actor, ctx, { campaignId: id, changes: dto });
     return campaign;
   }
   async deleteCampaign(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const existing = await this.repo.findCampaign(id);
-    if (!existing) throw new ApiError(404, "Campaign not found");
+    if (!existing) throw new ApiError(404, "الحملة غير موجودة.");
     await this.repo.deleteCampaign(id);
     await this.audit("CAMPAIGN_UPDATED", actor, ctx, { campaignId: id, deleted: true });
   }

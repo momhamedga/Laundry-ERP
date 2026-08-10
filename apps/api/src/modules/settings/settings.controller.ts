@@ -9,7 +9,7 @@ import type { SettingsService } from "./settings.service.js";
 
 /** يضمن وجود req.user - تُستدعى فقط بعد authenticate */
 function requireUser(req: Request): AuthenticatedUser {
-  if (!req.user) throw new ApiError(401, "Authentication required");
+  if (!req.user) throw new ApiError(401, "يلزم تسجيل الدخول للمتابعة.");
   return req.user;
 }
 

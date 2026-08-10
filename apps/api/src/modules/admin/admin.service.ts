@@ -219,7 +219,12 @@ export class AdminService {
     actor: AuthenticatedUser,
     ctx: RequestContext,
     targetUserId: string,
-  ): Promise<{ accessToken: string; user: { id: string; name: string; email: string; role: UserRole } }> {
+  ): Promise<{
+    accessToken: string;
+    // branchId ضمن الرد: الجلسة المنتحَلة يجب أن تتصرّف كالمستخدم الهدف تماماً،
+    // وبدونه تظنّ الواجهة أن الحساب بلا فرع فتعرض له اختيار فرع لا يخصّه.
+    user: { id: string; name: string; email: string; role: UserRole; branchId: string | null };
+  }> {
     if (actor.role !== "ADMIN") throw new ApiError(403, "الانتحال متاح لمدير النظام فقط");
     if (actor.impersonatedBy) throw new ApiError(409, "أنت بالفعل في جلسة انتحال");
     if (targetUserId === actor.id) throw new ApiError(400, "لا يمكن انتحال حسابك");
@@ -237,7 +242,13 @@ export class AdminService {
     await this.audit(actor, ctx, "USER_IMPERSONATED", { targetUserId, event: "start" });
     return {
       accessToken,
-      user: { id: target.id, name: target.name, email: target.email, role: target.role },
+      user: {
+        id: target.id,
+        name: target.name,
+        email: target.email,
+        role: target.role,
+        branchId: target.branchId,
+      },
     };
   }
 

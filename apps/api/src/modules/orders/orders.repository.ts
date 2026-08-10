@@ -182,7 +182,7 @@ export class OrdersRepository {
         if (!isCollision || attempt === ORDER_NUMBER_MAX_RETRIES) throw err;
       }
     }
-    throw new ApiError(409, "Could not allocate order number. Please retry");
+    throw new ApiError(409, "تعذّر حجز رقم طلب. أعد المحاولة.");
   }
 
   // ==================== Update (Atomic) ====================

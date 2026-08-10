@@ -100,10 +100,17 @@ export class AdminRepository {
 
   userForAuth(
     userId: string,
-  ): Promise<{ id: string; name: string; email: string; role: UserRole; isActive: boolean } | null> {
+  ): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    isActive: boolean;
+    branchId: string | null;
+  } | null> {
     return this.db.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true, branchId: true },
     });
   }
 

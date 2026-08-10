@@ -32,7 +32,7 @@ export class BarcodeService {
 
   private async getItemOrFail(id: string): Promise<InventoryItem> {
     const item = await this.repo.findItem(id);
-    if (!item) throw new ApiError(404, "Inventory item not found");
+    if (!item) throw new ApiError(404, "الصنف غير موجود في المخزون.");
     return item;
   }
 
@@ -54,12 +54,12 @@ export class BarcodeService {
 
     let value: string;
     if (dto.mode === "manual") {
-      if (!dto.value) throw new ApiError(400, "Manual mode requires a value");
+      if (!dto.value) throw new ApiError(400, "الوضع اليدوي يتطلّب إدخال قيمة.");
       if (!isValidBarcodeValue(dto.type, dto.value)) {
-        throw new ApiError(400, `Invalid ${dto.type} value`);
+        throw new ApiError(400, `قيمة غير صالحة لنوع الباركود ${dto.type}.`);
       }
       const clash = await this.repo.findItemByBarcode(dto.value);
-      if (clash && clash.id !== id) throw new ApiError(409, "Barcode already used by another item");
+      if (clash && clash.id !== id) throw new ApiError(409, "الباركود مستخدم بالفعل لصنف آخر.");
       value = dto.value;
     } else {
       value = await this.generateUniqueValue(dto.type, item.sku, id);
@@ -137,11 +137,12 @@ export class BarcodeService {
     const item = await this.getItemOrFail(id);
     const type = dto.type ?? item.barcodeType;
     const value = dto.value ?? item.barcode;
-    if (!type || !value) throw new ApiError(400, "Both type and value are required");
-    if (!isValidBarcodeValue(type, value)) throw new ApiError(400, `Invalid ${type} value`);
+    if (!type || !value) throw new ApiError(400, "النوع والقيمة كلاهما مطلوب.");
+    if (!isValidBarcodeValue(type, value))
+      throw new ApiError(400, `قيمة غير صالحة لنوع الباركود ${type}.`);
     if (dto.value) {
       const clash = await this.repo.findItemByBarcode(dto.value);
-      if (clash && clash.id !== id) throw new ApiError(409, "Barcode already used by another item");
+      if (clash && clash.id !== id) throw new ApiError(409, "الباركود مستخدم بالفعل لصنف آخر.");
     }
     const updated = await this.repo.updateItem(id, { barcode: value, barcodeType: type });
     await this.audit("BARCODE_UPDATED", actor, ctx, { itemId: id, sku: item.sku, type });
@@ -150,7 +151,7 @@ export class BarcodeService {
 
   async deleteBarcode(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const item = await this.getItemOrFail(id);
-    if (!item.barcode) throw new ApiError(400, "Item has no barcode");
+    if (!item.barcode) throw new ApiError(400, "لا يوجد باركود لهذا الصنف.");
     await this.repo.updateItem(id, { barcode: null, barcodeType: null, qrCode: null });
     await this.audit("BARCODE_DELETED", actor, ctx, { itemId: id, sku: item.sku });
   }
@@ -166,12 +167,12 @@ export class BarcodeService {
     const items = await this.repo.findItemsByIds(ids);
     const found = new Set(items.map((i) => i.id));
     const valid = dto.items.filter((i) => found.has(i.itemId));
-    if (valid.length === 0) throw new ApiError(400, "No valid items to print");
+    if (valid.length === 0) throw new ApiError(400, "لا توجد أصناف صالحة للطباعة.");
 
     let templateName: string | null = null;
     if (dto.templateId) {
       const tpl = await this.repo.findTemplateById(dto.templateId);
-      if (!tpl) throw new ApiError(404, "Template not found");
+      if (!tpl) throw new ApiError(404, "القالب غير موجود.");
       templateName = tpl.name;
     }
 
@@ -267,7 +268,7 @@ export class BarcodeService {
     ctx: RequestContext,
   ): Promise<LabelTemplate> {
     const existing = await this.repo.findTemplateById(id);
-    if (!existing) throw new ApiError(404, "Template not found");
+    if (!existing) throw new ApiError(404, "القالب غير موجود.");
     if (dto.isDefault) await this.repo.clearDefaultTemplates();
     const tpl = await this.repo.updateTemplate(id, dto);
     await this.audit("LABEL_TEMPLATE_UPDATED", actor, ctx, { templateId: id, changes: dto });
@@ -276,16 +277,16 @@ export class BarcodeService {
 
   async deleteTemplate(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const existing = await this.repo.findTemplateById(id);
-    if (!existing) throw new ApiError(404, "Template not found");
+    if (!existing) throw new ApiError(404, "القالب غير موجود.");
     const usage = await this.repo.countTemplateUsage(id);
-    if (usage > 0) throw new ApiError(409, `Template is used by ${usage} item(s)`);
+    if (usage > 0) throw new ApiError(409, `القالب مستخدم في ${usage} صنف، فلا يمكن حذفه.`);
     await this.repo.deleteTemplate(id);
     await this.audit("LABEL_TEMPLATE_DELETED", actor, ctx, { templateId: id, name: existing.name });
   }
 
   getTemplate(id: string): Promise<LabelTemplate> {
     return this.repo.findTemplateById(id).then((t) => {
-      if (!t) throw new ApiError(404, "Template not found");
+      if (!t) throw new ApiError(404, "القالب غير موجود.");
       return t;
     });
   }
@@ -327,7 +328,7 @@ export class BarcodeService {
       const clash = await this.repo.findItemByBarcode(value);
       if (!clash || clash.id === itemId) return value;
     }
-    throw new ApiError(500, "Failed to generate a unique barcode value");
+    throw new ApiError(500, "تعذّر توليد قيمة باركود فريدة. أعد المحاولة.");
   }
 
   private emit(event: Parameters<typeof notificationBus.emitNotification>[0]): void {

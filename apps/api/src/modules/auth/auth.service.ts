@@ -50,7 +50,7 @@ export class AuthService {
         ctx,
         metadata: { reason: "user_not_found" },
       });
-      throw new ApiError(401, "Invalid email or password");
+      throw new ApiError(401, "البريد الإلكتروني أو كلمة السر غير صحيحة.");
     }
 
     if (!user.isActive) {
@@ -61,7 +61,7 @@ export class AuthService {
         ctx,
         metadata: { reason: "account_inactive" },
       });
-      throw new ApiError(403, "Account is disabled");
+      throw new ApiError(403, "هذا الحساب موقوف. راجع المسؤول.");
     }
 
     // Account Lock - الحساب مقفول حالياً؟
@@ -69,14 +69,14 @@ export class AuthService {
       const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
       throw new ApiError(
         423,
-        `Account locked due to failed attempts. Try again in ${minutesLeft} minute(s)`,
+        `تم قفل الحساب مؤقتاً بسبب محاولات دخول فاشلة. أعد المحاولة بعد ${minutesLeft} دقيقة.`,
       );
     }
 
     const passwordValid = await comparePassword(dto.password, user.passwordHash);
     if (!passwordValid) {
       await this.handleFailedAttempt(user, ctx);
-      throw new ApiError(401, "Invalid email or password");
+      throw new ApiError(401, "البريد الإلكتروني أو كلمة السر غير صحيحة.");
     }
 
     // نجاح: تصفير العداد + إصدار التوكينات + تدقيق
@@ -165,7 +165,7 @@ export class AuthService {
     const stored = await this.repo.findRefreshTokenByHash(hashToken(rawToken));
 
     if (!stored) {
-      throw new ApiError(401, "Invalid refresh token");
+      throw new ApiError(401, "جلسة غير صالحة. سجّل الدخول من جديد.");
     }
 
     // Reuse Detection - التوكين سبق إبطاله ويُعاد استخدامه
@@ -177,16 +177,16 @@ export class AuthService {
         ctx,
         metadata: { tokenId: stored.id },
       });
-      throw new ApiError(401, "Refresh token reuse detected. All sessions revoked");
+      throw new ApiError(401, "رُصد استخدام جلسة منتهية، وأُلغيت كل الجلسات احتياطاً. سجّل الدخول من جديد.");
     }
 
     if (stored.expiresAt.getTime() <= Date.now()) {
-      throw new ApiError(401, "Refresh token expired");
+      throw new ApiError(401, "انتهت صلاحية الجلسة. سجّل الدخول من جديد.");
     }
 
     const user = await this.repo.findUserById(stored.userId);
     if (!user || !user.isActive) {
-      throw new ApiError(401, "Account is inactive or no longer exists");
+      throw new ApiError(401, "الحساب موقوف أو لم يعد موجوداً.");
     }
 
     // Rotation: إبطال القديم ثم إصدار زوج جديد
@@ -223,7 +223,7 @@ export class AuthService {
   async getCurrentUser(userId: string): Promise<SafeUser> {
     const user = await this.repo.findUserById(userId);
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError(404, "المستخدم غير موجود.");
     }
     return toSafeUser(user);
   }
@@ -237,12 +237,12 @@ export class AuthService {
   ): Promise<void> {
     const user = await this.repo.findUserById(userId);
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError(404, "المستخدم غير موجود.");
     }
 
     const valid = await comparePassword(dto.currentPassword, user.passwordHash);
     if (!valid) {
-      throw new ApiError(400, "Current password is incorrect");
+      throw new ApiError(400, "كلمة السر الحالية غير صحيحة.");
     }
 
     await this.repo.updatePassword(userId, await hashPassword(dto.newPassword));
@@ -300,7 +300,7 @@ export class AuthService {
       !user.resetTokenExpiresAt ||
       user.resetTokenExpiresAt.getTime() <= Date.now()
     ) {
-      throw new ApiError(400, "Invalid or expired reset token");
+      throw new ApiError(400, "رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.");
     }
 
     await this.repo.updatePassword(user.id, await hashPassword(dto.newPassword));
@@ -338,7 +338,7 @@ export class AuthService {
   async revokeSession(userId: string, sessionId: string, ctx: RequestContext): Promise<void> {
     const session = await this.repo.findSessionById(sessionId, userId);
     if (!session) {
-      throw new ApiError(404, "Session not found");
+      throw new ApiError(404, "الجلسة غير موجودة.");
     }
     if (!session.revokedAt) {
       await this.repo.revokeRefreshToken(session.id);

@@ -1,4 +1,5 @@
 import type { SystemSettings } from "@prisma/client";
+import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
 import type { InvoiceDetail } from "./invoice.types.js";
 
 /**
@@ -70,8 +71,9 @@ export function buildInvoiceHtml({ invoice, company, qrDataUrl, barcodeDataUrl }
 <meta charset="utf-8" />
 <title>فاتورة ${escapeHtml(invoice.invoiceNumber)}</title>
 <style>
+  ${PDF_FONT_FACE_CSS}
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
+  body { font-family: ${PDF_FONT_STACK}; color: #0f172a; margin: 0; padding: 0; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; }
   .company img { max-height: 64px; max-width: 180px; margin-bottom: 8px; }
   .company .name { font-size: 20px; font-weight: bold; }

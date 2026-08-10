@@ -91,7 +91,7 @@ export async function removeUserOverride(userId: string, permission: string): Pr
 
 export interface ImpersonationResult {
   accessToken: string;
-  user: { id: string; name: string; email: string; role: UserRole };
+  user: { id: string; name: string; email: string; role: UserRole; branchId: string | null };
 }
 
 export async function impersonateUser(userId: string): Promise<ImpersonationResult> {

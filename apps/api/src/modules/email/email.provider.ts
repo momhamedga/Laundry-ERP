@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { ApiError } from "../../middlewares/error.middleware.js";
 import type { EmailProvider, SendEmailParams } from "./email.types.js";
 
 /**
@@ -8,6 +9,10 @@ import type { EmailProvider, SendEmailParams } from "./email.types.js";
  *
  * بلا مفتاح حقيقي (RESEND_API_KEY غير مُهيَّأ): send() يرفض بخطأ واضح بدل
  * محاولة إرسال وهمية - الخادم نفسه لا يُسقَط عند الإقلاع (متغير بيئة اختياري).
+ *
+ * الرفض بـApiError لا بـError عادي: الأخير يسقط في الفرع العام للمعالج المركزي
+ * فيتحوّل إلى 500 و«حدث خطأ غير متوقّع في النظام» — وهي إفادة خاطئة (العطل في
+ * التهيئة أو عند المزوّد، لا في الشيفرة) وتترك المستخدم بلا أي دليل على السبب.
  */
 export class ResendEmailProvider implements EmailProvider {
   private readonly client: Resend | null;
@@ -21,8 +26,9 @@ export class ResendEmailProvider implements EmailProvider {
 
   async send(params: SendEmailParams): Promise<void> {
     if (!this.client) {
-      throw new Error(
-        "RESEND_API_KEY غير مُهيَّأ - تعذَّر إرسال البريد. أضِفه لمتغيرات البيئة لتفعيل الإرسال الحقيقي.",
+      throw new ApiError(
+        503,
+        "خدمة البريد غير مُفعَّلة على الخادم (مفتاح المزوّد غير مضبوط). راجع مسؤول النظام.",
       );
     }
 
@@ -43,7 +49,13 @@ export class ResendEmailProvider implements EmailProvider {
     });
 
     if (error) {
-      throw new Error(`فشل إرسال البريد عبر Resend: ${error.message}`);
+      // نصّ المزوّد إنجليزي وتقنيّ («domain is not verified»، «invalid from»)،
+      // فيُسجَّل كاملاً للتشخيص ولا يُعرَض كما هو داخل واجهة عربية.
+      console.error("💥 فشل إرسال البريد عبر Resend:", error);
+      throw new ApiError(
+        502,
+        "تعذّر إرسال البريد عبر مزوّد الخدمة. أعد المحاولة، وإن تكرّر راجع مسؤول النظام.",
+      );
     }
   }
 }

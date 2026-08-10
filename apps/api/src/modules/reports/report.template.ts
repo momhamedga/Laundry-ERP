@@ -1,9 +1,10 @@
 import type { SystemSettings } from "@prisma/client";
+import { PDF_FONT_FACE_CSS, PDF_FONT_STACK } from "../../lib/pdf-fonts.js";
 
 /**
  * قالب HTML مشترك بين PDF (عبر lib/pdf.ts المُعاد استخدامه) وPrint (HTML خام) -
  * مصدر حقيقة واحد لمستند التقرير، بنفس أسلوب invoice.template.ts حرفياً
- * (Segoe UI/Tahoma, RTL, escapeHtml, صناديق معلومات، جدول، ملخص) لاتساق بصري
+ * (خطّ مضمَّن مشترك, RTL, escapeHtml, صناديق معلومات، جدول، ملخص) لاتساق بصري
  * عبر كل مستندات المشروع.
  */
 
@@ -91,8 +92,9 @@ export function buildReportHtml({
 <meta charset="utf-8" />
 <title>${escapeHtml(title)}</title>
 <style>
+  ${PDF_FONT_FACE_CSS}
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
+  body { font-family: ${PDF_FONT_STACK}; color: #0f172a; margin: 0; padding: 0; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px; }
   .company img { max-height: 56px; max-width: 160px; margin-bottom: 6px; }
   .company .name { font-size: 18px; font-weight: bold; }

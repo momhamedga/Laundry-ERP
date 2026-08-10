@@ -23,7 +23,7 @@ export class MembershipService {
   async getTierBenefits(level: MembershipLevel): Promise<MembershipTierConfig> {
     await this.repo.ensureTiers();
     const tier = await this.repo.findTierByLevel(level);
-    if (!tier) throw new ApiError(404, "Tier config not found");
+    if (!tier) throw new ApiError(404, "إعداد المستوى غير موجود.");
     return tier;
   }
 
@@ -67,9 +67,9 @@ export class MembershipService {
   /** ترقية/تخفيض يدوي صريح */
   async manualSetLevel(dto: ManualLevelDto, actor: AuthenticatedUser, ctx: RequestContext): Promise<TierEvaluation> {
     const account = await this.repo.findAccountByCustomer(dto.customerId);
-    if (!account) throw new ApiError(404, "Customer has no loyalty account");
+    if (!account) throw new ApiError(404, "لا يوجد حساب ولاء لهذا العميل.");
     const oldLevel = account.membershipLevel;
-    if (oldLevel === dto.level) throw new ApiError(400, "Customer already at this level");
+    if (oldLevel === dto.level) throw new ApiError(400, "العميل في هذا المستوى بالفعل.");
     await this.repo.updateAccountLevel(dto.customerId, dto.level);
     const up = LEVEL_ORDER.indexOf(dto.level) > LEVEL_ORDER.indexOf(oldLevel);
 
@@ -94,7 +94,7 @@ export class MembershipService {
   ): Promise<MembershipTierConfig> {
     await this.repo.ensureTiers();
     const existing = await this.repo.findTierByLevel(level);
-    if (!existing) throw new ApiError(404, "Tier not found");
+    if (!existing) throw new ApiError(404, "المستوى غير موجود.");
     const tier = await this.repo.updateTier(level, dto);
     await this.audit("MEMBERSHIP_TIER_UPDATED", actor, ctx, { level, changes: dto });
     return tier;

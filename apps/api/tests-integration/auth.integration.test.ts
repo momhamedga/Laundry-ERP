@@ -53,13 +53,13 @@ describe("auth (integration)", () => {
       await createUser({ email: "u@test.local", role: "CASHIER" });
       const res = await api(app).post("/api/v1/auth/login").send({ email: "u@test.local", password: "WrongPass1" });
       expect(res.status).toBe(401);
-      expect(res.body.message).toMatch(/invalid email or password/i);
+      expect(res.body.message).toBe("البريد الإلكتروني أو كلمة السر غير صحيحة.");
     });
 
     it("unknown email → 401 (same message as wrong password)", async () => {
       const res = await api(app).post("/api/v1/auth/login").send({ email: "ghost@test.local", password: "WhateverPass1" });
       expect(res.status).toBe(401);
-      expect(res.body.message).toMatch(/invalid email or password/i);
+      expect(res.body.message).toBe("البريد الإلكتروني أو كلمة السر غير صحيحة.");
     });
 
     it("inactive account → 403", async () => {
