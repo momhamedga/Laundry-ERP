@@ -199,12 +199,12 @@ export class BackupService {
   async openBackupFile(id: string): Promise<{ stream: ReadStream; filename: string; size: number }> {
     const record = await this.repo.findRecordById(id);
     if (!record || !record.storagePath) {
-      throw new BackupNotFoundError("Backup file not found");
+      throw new BackupNotFoundError("ملف النسخة الاحتياطية غير موجود.");
     }
     try {
       await access(record.storagePath, constants.R_OK);
     } catch {
-      throw new BackupNotFoundError("Backup file missing on disk");
+      throw new BackupNotFoundError("سجلّ النسخة موجود لكن ملفها غير موجود على القرص. غالباً حُذف مع إعادة تشغيل الخادم.");
     }
     const fileStat = await stat(record.storagePath);
     return {
@@ -216,7 +216,7 @@ export class BackupService {
 
   async deleteRecord(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const record = await this.repo.findRecordById(id);
-    if (!record) throw new BackupNotFoundError("Backup not found");
+    if (!record) throw new BackupNotFoundError("النسخة الاحتياطية غير موجودة.");
 
     await this.removeFileQuiet(record.storagePath);
     await this.repo.softDeleteRecord(id);
@@ -258,9 +258,9 @@ export class BackupService {
   /** إعادة محاولة نسخة فاشلة - نفس السجل، retryCount++ (بلا سجل جديد) */
   async retry(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<BackupRecord> {
     const record = await this.repo.findRecordById(id);
-    if (!record) throw new BackupNotFoundError("Backup not found");
+    if (!record) throw new BackupNotFoundError("النسخة الاحتياطية غير موجودة.");
     if (record.status !== "FAILED") {
-      throw new BackupConflictError("Only failed backups can be retried");
+      throw new BackupConflictError("لا تُعاد المحاولة إلا للنسخ الفاشلة.");
     }
     await this.repo.updateRecord(id, { retryCount: record.retryCount + 1 });
     await this.repo.createAuditLog({
@@ -325,17 +325,17 @@ export class BackupService {
   ): Promise<RestoreResult> {
     const checksum = computeBufferChecksum(buffer);
     if (expectedChecksum && expectedChecksum !== checksum) {
-      throw new BackupValidationError("Checksum mismatch - file changed since preview");
+      throw new BackupValidationError("بصمة الملف لا تطابق المعاينة — تغيّر الملف بعد فحصه.");
     }
 
     let payload: BackupPayload;
     try {
       payload = JSON.parse(buffer.toString("utf-8"), reviveDates) as BackupPayload;
     } catch {
-      throw new BackupValidationError("Invalid JSON backup file");
+      throw new BackupValidationError("ملف النسخة الاحتياطية ليس JSON صالحاً.");
     }
     if (!this.isValidPayload(payload)) {
-      throw new BackupValidationError("Incomplete or incompatible backup structure");
+      throw new BackupValidationError("بنية النسخة الاحتياطية ناقصة أو غير متوافقة.");
     }
 
     const result = await this.repo.restoreBusinessData(payload);

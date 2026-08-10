@@ -48,7 +48,7 @@ export const updateItemSchema = z
     supplierId: z.cuid("Invalid supplier id").nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const listItemsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(DEFAULT_PAGE),
@@ -86,7 +86,7 @@ export const transferSchema = z
     note: z.string().trim().max(500).nullish(),
   })
   .refine((d) => d.fromItemId !== d.toItemId, {
-    message: "Source and destination must differ",
+    message: "المصدر والوجهة يجب أن يختلفا.",
     path: ["toItemId"],
   });
 

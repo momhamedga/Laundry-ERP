@@ -156,7 +156,7 @@ export const exportQuerySchema = z
       ...dateRangeShape,
     }),
   ])
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 export type ExportQuery = z.infer<typeof exportQuerySchema>;
 export type ExportReportType = ExportQuery["type"];

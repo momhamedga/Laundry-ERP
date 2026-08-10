@@ -1,0 +1,61 @@
+name: Uptime
+
+# مراقبة توقّف الـAPI. لا خدمة خارجية ولا حساب إضافي: GitHub يرسل بريداً
+# لمالك المستودع تلقائياً عند فشل أي تشغيل مجدول، فالفشل نفسه هو التنبيه.
+#
+# حدود يجب معرفتها قبل الاعتماد عليها:
+#   • جدولة GitHub ليست دقيقة — قد تتأخّر دقائق تحت الضغط، فزمن الاكتشاف
+#     الفعلي ~5–20 دقيقة لا 5 بالضبط.
+#   • GitHub يوقف الجداول تلقائياً في مستودع بلا نشاط 60 يوماً.
+#   • هذه مراقبة «هل الخدمة حيّة»، لا بديل عن مراقبة أداء أو تنبيه فوري.
+# لو احتاج المشروع اكتشافاً أسرع أو تنبيهاً على الهاتف، فالمكان الصحيح خدمة
+# مراقبة مخصّصة لا هذا الملف.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # تشغيل يدوي للتأكد من أن الفحص نفسه سليم
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: فحص صحّة الـAPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe /health
+        env:
+          # متغيّر مستودع (Settings → Variables) ليتغيّر النطاق بلا تعديل الملف
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://api.college-victoria.org/api/v1/health' }}
+        run: |
+          set -uo pipefail
+
+          # ثلاث محاولات متباعدة: انقطاع لحظة واحدة ليس عطلاً يستحقّ إيقاظ أحد،
+          # وإنذار كاذب متكرّر يجعل التنبيه كلّه يُتجاهَل.
+          attempt=0
+          until [ "$attempt" -ge 3 ]; do
+            attempt=$((attempt + 1))
+            body=$(curl -sS --max-time 25 -w '\n%{http_code}' "$HEALTH_URL" 2>&1) || body="CURL_FAILED"
+            code=$(printf '%s' "$body" | tail -n1)
+            payload=$(printf '%s' "$body" | sed '$d')
+
+            if [ "$code" = "200" ] && printf '%s' "$payload" | grep -q '"database":"connected"'; then
+              echo "✅ سليم (محاولة $attempt): $payload"
+              exit 0
+            fi
+
+            echo "⚠️ المحاولة $attempt فشلت — رمز=$code"
+            echo "   الرد: $payload"
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+
+          echo ""
+          echo "::error::الـAPI لا يستجيب بحالة سليمة بعد 3 محاولات — $HEALTH_URL"
+          echo "افحص: Railway (هل الخدمة Running؟) · Neon (هل قاعدة البيانات متاحة؟) · DNS"
+          exit 1

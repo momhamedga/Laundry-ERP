@@ -66,5 +66,5 @@ export const updateSettingsSchema = z
   .partial()
   .refine(
     (d) => Object.values(d).some((section) => section && Object.keys(section).length > 0),
-    { message: "No fields to update" },
+    { message: "لا توجد حقول للتعديل." },
   );

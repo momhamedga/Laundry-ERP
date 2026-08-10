@@ -67,7 +67,7 @@ export const createOrderSchema = z
     items: z.array(orderItemSchema).min(1, "Order must have at least one item").max(MAX_ORDER_ITEMS),
   })
   .refine((d) => d.dueDate.getTime() > d.receivedAt.getTime(), {
-    message: "dueDate must be after receivedAt",
+    message: "تاريخ التسليم يجب أن يكون بعد تاريخ الاستلام.",
     path: ["dueDate"],
   });
 
@@ -80,7 +80,7 @@ export const updateOrderSchema = z
     items: z.array(orderItemSchema).min(1, "Order must have at least one item").max(MAX_ORDER_ITEMS),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const changeStatusSchema = z
   .object({
@@ -88,7 +88,7 @@ export const changeStatusSchema = z
     notes: notesSchema.nullish(),
   })
   .refine((d) => d.status !== "CANCELLED", {
-    message: "Use the cancel endpoint to cancel an order",
+    message: "لإلغاء الطلب استخدم إجراء الإلغاء المخصّص.",
     path: ["status"],
   });
 

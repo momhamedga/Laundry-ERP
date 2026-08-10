@@ -22,7 +22,7 @@ export const changePasswordSchema = z
     newPassword: passwordSchema,
   })
   .refine((d) => d.currentPassword !== d.newPassword, {
-    message: "New password must be different from current password",
+    message: "كلمة السر الجديدة يجب أن تختلف عن الحالية.",
     path: ["newPassword"],
   });
 

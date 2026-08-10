@@ -13,7 +13,7 @@ export const loginRateLimiter = rateLimit({
   limit: 10,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many login attempts. Try again later" },
+  message: { success: false, message: "محاولات دخول كثيرة. انتظر قليلاً ثم أعد المحاولة." },
 });
 
 /** حد لطلبات استعادة كلمة السر - يمنع إغراق البريد */
@@ -22,7 +22,7 @@ export const passwordResetRateLimiter = rateLimit({
   limit: 5,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many reset requests. Try again later" },
+  message: { success: false, message: "طلبات استعادة كثيرة. انتظر قليلاً ثم أعد المحاولة." },
 });
 
 /** حد عام لبقية مسارات المصادقة (refresh/logout...) */
@@ -31,5 +31,5 @@ export const authRateLimiter = rateLimit({
   limit: 100,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many requests. Try again later" },
+  message: { success: false, message: "طلبات كثيرة جداً. انتظر قليلاً ثم أعد المحاولة." },
 });

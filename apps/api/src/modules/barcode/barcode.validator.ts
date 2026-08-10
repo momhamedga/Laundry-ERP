@@ -39,7 +39,7 @@ export const updateBarcodeSchema = z
     value: z.string().trim().min(1).max(1000),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 // ==================== Print ====================
 
@@ -125,7 +125,7 @@ export const createTemplateSchema = z.object({
 export const updateTemplateSchema = z
   .object(templateFields)
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const listTemplatesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(DEFAULT_PAGE),

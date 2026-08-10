@@ -59,7 +59,7 @@ export const updateServiceSchema = z
     sortOrder: z.number().int().min(0),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 /** Active / Inactive */
 export const serviceStatusSchema = z.object({

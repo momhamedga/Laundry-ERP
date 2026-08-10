@@ -81,7 +81,7 @@ export const updateChannelSettingsSchema = z
     digestMode: z.enum(DigestMode),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 // ملاحظة: التحقق من "quietHoursStart/End مطلوبان إن كان quietHoursEnabled=true"
 // يتم بالخدمة بعد الدمج مع القيم المخزَّنة حالياً - Zod هنا يرى الحمولة الجزئية
 // فقط فلا يستطيع معرفة القيم القديمة (طلب يُفعِّل quietHoursEnabled فقط دون

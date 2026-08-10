@@ -48,7 +48,7 @@ export const updateCouponSchema = z
     isActive: z.boolean(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const validateCouponSchema = z.object({
   code: z.string().trim().min(1).max(40),

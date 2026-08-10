@@ -56,7 +56,7 @@ export const updateBackupSettingsSchema = z
     scheduleTimezone: z.string().trim().min(1).max(100),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export type UpdateBackupSettingsInput = z.infer<typeof updateBackupSettingsSchema>;
 

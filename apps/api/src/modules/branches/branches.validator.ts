@@ -36,7 +36,7 @@ export const updateBranchSchema = z
     phone: phoneSchema.nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const branchStatusSchema = z.object({
   isActive: z.boolean(),

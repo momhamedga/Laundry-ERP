@@ -64,7 +64,7 @@ export const updateInvoiceSchema = z
     notes: notesSchema.nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 // ==================== Documents (Print/PDF/Email) ====================
 

@@ -34,7 +34,7 @@ export const updateSupplierSchema = z
     notes: z.string().trim().max(1000).nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const listSuppliersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(DEFAULT_PAGE),

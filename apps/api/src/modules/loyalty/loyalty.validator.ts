@@ -57,7 +57,7 @@ export const updateSettingsSchema = z
     referralBonus: z.coerce.number().int().min(0),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 // ==================== Campaigns ====================
 
@@ -82,7 +82,7 @@ export const updateCampaignSchema = z
     isActive: z.boolean(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 // ==================== Queries ====================
 

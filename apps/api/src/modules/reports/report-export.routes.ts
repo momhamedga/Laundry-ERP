@@ -16,7 +16,7 @@ const exportRateLimiter = rateLimit({
   limit: 20,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many export requests. Try again later" },
+  message: { success: false, message: "طلبات تصدير كثيرة. انتظر قليلاً ثم أعد المحاولة." },
 });
 
 export function createReportExportRouter(controller: ReportExportController): Router {

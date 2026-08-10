@@ -53,7 +53,7 @@ export const updateUserSchema = z
     branchId: z.cuid("Invalid branch id").nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 /** الحقول التي يملك المستخدم تعديلها في ملفه الشخصي فقط */
 export const updateProfileSchema = z
@@ -62,7 +62,7 @@ export const updateProfileSchema = z
     phone: phoneSchema.nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const changeStatusSchema = z.object({
   isActive: z.boolean(),

@@ -23,7 +23,7 @@ const bulkRateLimiter = rateLimit({
   limit: 60,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many bulk requests. Try again later" },
+  message: { success: false, message: "طلبات جماعية كثيرة. انتظر قليلاً ثم أعد المحاولة." },
 });
 
 const scanRateLimiter = rateLimit({
@@ -31,7 +31,7 @@ const scanRateLimiter = rateLimit({
   limit: 300, // المسح متكرر بطبيعته - حدّ مرتفع لكل دقيقة
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { success: false, message: "Too many scan requests. Slow down" },
+  message: { success: false, message: "عمليات مسح كثيرة ومتلاحقة. تمهّل قليلاً." },
 });
 
 /**

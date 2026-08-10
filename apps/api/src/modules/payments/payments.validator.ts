@@ -53,7 +53,7 @@ export const updatePaymentSchema = z
     status: z.enum([PaymentTxStatus.COMPLETED, PaymentTxStatus.FAILED]),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const refundPaymentSchema = z.object({
   /** بدون مبلغ = استرداد كامل المتبقي */

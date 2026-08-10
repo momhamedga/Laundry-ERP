@@ -44,7 +44,7 @@ export const updateCustomerSchema = z
     notes: notesSchema.nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, { message: "No fields to update" });
+  .refine((d) => Object.keys(d).length > 0, { message: "لا توجد حقول للتعديل." });
 
 export const updateNotesSchema = z.object({
   notes: notesSchema.nullable(),
@@ -59,7 +59,7 @@ export const mergeCustomersSchema = z
     targetId: z.cuid("Invalid target customer id"),
   })
   .refine((d) => d.sourceId !== d.targetId, {
-    message: "Source and target must be different customers",
+    message: "لا يمكن الدمج: العميلان متطابقان.",
     path: ["targetId"],
   });
 

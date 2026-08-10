@@ -46,7 +46,7 @@ export const ordersReportQuerySchema = z
     sortBy: z.enum(ORDERS_REPORT_SORTABLE_FIELDS).default("receivedAt"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 // ==================== 2) Payments Report ====================
 
@@ -60,7 +60,7 @@ export const paymentsReportQuerySchema = z
     sortBy: z.enum(PAYMENTS_REPORT_SORTABLE_FIELDS).default("createdAt"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 // ==================== 3) Customers Report ====================
 
@@ -73,7 +73,7 @@ export const customersReportQuerySchema = z
     sortBy: z.enum(CUSTOMERS_REPORT_SORTABLE_FIELDS).default("createdAt"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 // ==================== 4) Services Report ====================
 
@@ -85,7 +85,7 @@ export const servicesReportQuerySchema = z
     sortBy: z.enum(SERVICES_REPORT_SORTABLE_FIELDS).default("timesUsed"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 // ==================== 5) Branches Report ====================
 
@@ -96,7 +96,7 @@ export const branchesReportQuerySchema = z
     sortBy: z.enum(BRANCHES_REPORT_SORTABLE_FIELDS).default("revenue"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
 
 // ==================== 6) Employees Report ====================
 
@@ -108,4 +108,4 @@ export const employeesReportQuerySchema = z
     sortBy: z.enum(EMPLOYEES_REPORT_SORTABLE_FIELDS).default("ordersCreatedCount"),
     sortOrder: z.enum(SORT_ORDERS).default("desc"),
   })
-  .refine(refineDateRange, { message: "from must be before or equal to to", path: ["to"] });
+  .refine(refineDateRange, { message: "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.", path: ["to"] });
