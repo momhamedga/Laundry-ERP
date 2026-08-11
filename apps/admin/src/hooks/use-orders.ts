@@ -26,6 +26,8 @@ function toListParams(filters: OrdersFilters): ListOrdersParams {
     branchId: filters.branchId,
     receivedFrom: filters.receivedFrom,
     receivedTo: filters.receivedTo,
+    dueFrom: filters.dueFrom,
+    dueTo: filters.dueTo,
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
   };

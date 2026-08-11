@@ -128,6 +128,9 @@ export interface ListOrdersParams {
   /** yyyy-mm-dd */
   receivedFrom?: string;
   receivedTo?: string;
+  /** نطاق تاريخ الاستحقاق (yyyy-mm-dd أو ISO) - تصفية على الخادم لشاشة التسليمات */
+  dueFrom?: string;
+  dueTo?: string;
   sortBy?: OrderSortField;
   sortOrder?: SortOrder;
 }

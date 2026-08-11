@@ -13,6 +13,7 @@ import { buildBarcodeModule } from "./modules/barcode/index.js";
 import { buildCouponsModule } from "./modules/coupons/index.js";
 import { buildDayClosingModule, buildPeriodLockMiddleware } from "./modules/day-closing/index.js";
 import { buildEmployeesModule } from "./modules/employees/index.js";
+import { buildExpensesModule } from "./modules/expenses/index.js";
 import { buildHrModule } from "./modules/hr/index.js";
 import { buildLoyaltyModule } from "./modules/loyalty/index.js";
 import { buildMembershipModule } from "./modules/membership/index.js";
@@ -88,6 +89,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/coupons", buildCouponsModule());
   app.use("/api/v1/day-closing", buildDayClosingModule());
   app.use("/api/v1/employees", buildEmployeesModule());
+  app.use("/api/v1/expenses", buildExpensesModule());
   app.use("/api/v1/hr", buildHrModule());
   app.use("/api/v1/admin", buildAdminModule());
 
