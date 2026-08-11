@@ -46,6 +46,27 @@ export class ExpensesRepository {
    * والملغاة مستبعدة من الإجمالي دائماً — تبقى ظاهرة في السجلّ ولا تُحتسب.
    */
   async list(query: ListExpensesQuery): Promise<ListExpensesResult> {
+    /**
+     * تشخيص مؤقّت (QA) — يُحذف فور حسم سبب الـ500 على Railway.
+     *
+     * يطبع نوع المُفوِّض قبل أوّل استدعاء فعلي، ويلتقط نصّ الاستثناء الحقيقي
+     * الذي يُخفيه معالج الأخطاء في الإنتاج خلف رسالة عامّة. لا يُسجَّل أي محتوى
+     * استعلام ولا بيانات مستخدم — نوع الخطأ ورسالته فقط.
+     */
+    console.log(`[prisma-diagnostic] repository db.expense=${typeof this.db.expense}`);
+    try {
+      return await this.listInner(query);
+    } catch (err) {
+      console.error(
+        `[prisma-diagnostic] EXPENSES_LIST_FAILED name=${err instanceof Error ? err.name : typeof err} message=${
+          err instanceof Error ? err.message.split("\n")[0] : String(err)
+        }`,
+      );
+      throw err;
+    }
+  }
+
+  private async listInner(query: ListExpensesQuery): Promise<ListExpensesResult> {
     const where = this.buildWhere(query);
     const skip = (query.page - 1) * query.limit;
 

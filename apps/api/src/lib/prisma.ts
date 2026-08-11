@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { createRequire } from "node:module";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { env } from "../config/env.js";
 
 /**
@@ -25,3 +26,41 @@ export const prisma =
 if (!env.isProduction) {
   globalForPrisma.prisma = prisma;
 }
+
+/**
+ * تشخيص مؤقّت (QA) — أي عميل Prisma يُحمَّل فعلاً وقت التشغيل؟
+ *
+ * سببه: على Railway كل مسارات المصروفات تُعيد 500 بينما كل النماذج القديمة
+ * تعمل، والفرضية أن العميل المُحمَّل قديمٌ لا يعرف `Expense`. هذا يطبع الحقيقة
+ * بدل التخمين. لا يطبع رابط قاعدة ولا سرّاً ولا أي متغيّر بيئة — أسماء نماذج
+ * ومسارات وحدات فقط.
+ *
+ * يُحذف فور حسم التشخيص.
+ */
+function logPrismaDiagnostic(): void {
+  const tag = "[prisma-diagnostic]";
+  const safe = (fn: () => string): string => {
+    try {
+      return fn();
+    } catch (err) {
+      return `unresolved (${err instanceof Error ? err.name : "error"})`;
+    }
+  };
+  const require_ = createRequire(import.meta.url);
+
+  console.log(`${tag} clientVersion=${Prisma.prismaVersion?.client ?? "unknown"}`);
+  console.log(`${tag} expenseDelegate=${typeof (prisma as unknown as Record<string, unknown>).expense === "object"}`);
+  console.log(`${tag} branchDelegate=${typeof (prisma as unknown as Record<string, unknown>).branch === "object"}`);
+  console.log(`${tag} clientPath=${safe(() => require_.resolve("@prisma/client"))}`);
+  console.log(`${tag} generatedPath=${safe(() => require_.resolve(".prisma/client"))}`);
+  console.log(`${tag} cwd=${process.cwd()}`);
+
+  const models = Prisma.dmmf?.datamodel?.models?.map((m) => m.name) ?? [];
+  console.log(`${tag} dmmfModelCount=${models.length} hasExpenseInDmmf=${models.includes("Expense")}`);
+
+  if (typeof (prisma as unknown as Record<string, unknown>).expense !== "object") {
+    console.error(`${tag} EXPENSE_DELEGATE_MISSING`);
+  }
+}
+
+logPrismaDiagnostic();
