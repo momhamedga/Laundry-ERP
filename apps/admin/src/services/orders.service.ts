@@ -25,6 +25,8 @@ function toQueryParams(params: ListOrdersParams): Record<string, string> {
   if (params.branchId) query.branchId = params.branchId;
   if (params.receivedFrom) query.receivedFrom = params.receivedFrom;
   if (params.receivedTo) query.receivedTo = params.receivedTo;
+  if (params.dueFrom) query.dueFrom = params.dueFrom;
+  if (params.dueTo) query.dueTo = params.dueTo;
   if (params.sortBy) query.sortBy = params.sortBy;
   if (params.sortOrder) query.sortOrder = params.sortOrder;
   return query;

@@ -169,6 +169,10 @@ enum AuditAction {
   USER_PERMISSION_OVERRIDE
   USER_IMPERSONATED
   USER_BRANCH_CHANGED
+  /// المصروفات التشغيلية - الإلغاء لا الحذف (السجلّ المالي يبقى)
+  EXPENSE_CREATED
+  EXPENSE_UPDATED
+  EXPENSE_CANCELLED
 }
 
 /// نوع الإشعار - كل نوع مرتبط بحدث عمل حقيقي واحد (Phase 4B: توسعة كاملة لكل الوحدات)
@@ -508,6 +512,7 @@ model Branch {
   users    User[]
   orders   Order[]
   invoices Invoice[]
+  expenses Expense[]
 
   @@map("branches")
 }
@@ -547,6 +552,8 @@ model User {
   notificationPreferences NotificationPreference[]
   notificationSettings    UserNotificationSettings?
   backupsCreated          BackupRecord[]            @relation("BackupCreatedBy")
+  expensesCreated         Expense[]                 @relation("ExpenseCreatedBy")
+  expensesCancelled       Expense[]                 @relation("ExpenseCancelledBy")
   inventoryTransactions   InventoryTransaction[]    @relation("InventoryActor")
   inventoryAdjustments    InventoryAdjustment[]     @relation("AdjustmentActor")
   inventorySnapshots      InventorySnapshot[]       @relation("SnapshotCreatedBy")
@@ -1751,4 +1758,82 @@ model DayClosing {
   @@index([status])
   @@index([businessDate])
   @@map("day_closings")
+}
+
+// ==================== المصروفات التشغيلية ====================
+
+/**
+ * فئات المصروف.
+ *
+ * enum لا جدولاً: كل تصنيفات المشروع الأخرى (PurchaseStatus، InventoryItemType،
+ * LeaveType) enums، وإدارة فئات كاملة بـCRUD تضاعف نطاق الوحدة بلا حاجة مُثبتة.
+ * OTHER صمّام الأمان — لا يُضطرّ الموظّف لاختيار فئة خاطئة، ووجودها بكثرة في
+ * التقارير هو الإشارة الصحيحة لإضافة فئة جديدة.
+ */
+enum ExpenseCategory {
+  RENT // إيجار
+  ELECTRICITY // كهرباء
+  WATER // مياه
+  SALARIES // رواتب وأجور
+  DETERGENTS // منظفات ومستهلكات غسيل
+  MAINTENANCE // صيانة
+  TRANSPORTATION // نقل ومواصلات
+  SUPPLIES // مستلزمات ومشتريات عامة
+  OTHER // أخرى
+}
+
+/**
+ * حالة المصروف.
+ *
+ * الإلغاء لا الحذف — نفس نمط Payment وPurchase في هذا المشروع. حذف سجلّ مالي
+ * يجعل أي مراجعة لاحقة مستحيلة: يختلف الإجمالي ولا يبقى أثرٌ يفسّر السبب.
+ * والملغى يبقى ظاهراً في السجلّ ويخرج من كل حساب.
+ */
+enum ExpenseStatus {
+  ACTIVE
+  CANCELLED
+}
+
+/**
+ * مصروف تشغيلي.
+ *
+ * الفجوة التي يسدّها: النظام يسجّل الإيرادات والمدفوعات، ولا شيء يمثّل الإيجار
+ * والكهرباء والصيانة — فالإيراد وحده كان يُقرأ كأنه ربح.
+ *
+ * Restrict على الفرع والمنشئ: حذف فرع أو مستخدم لا يجوز أن يُيتّم سجلّاً مالياً
+ * أو يُسقطه من التقارير بأثر رجعي.
+ */
+model Expense {
+  id       String          @id @default(cuid())
+  amount   Decimal         @db.Decimal(12, 2)
+  category ExpenseCategory
+  status   ExpenseStatus   @default(ACTIVE)
+  /// وصف اختياري - "فاتورة كهرباء أغسطس" مثلاً
+  notes    String?
+
+  /// تاريخ استحقاق المصروف فعلياً، قد يسبق تاريخ التسجيل
+  expenseDate DateTime
+
+  /// سبب الإلغاء - يُطلب عند الإلغاء ليبقى القرار مفسَّراً في السجلّ
+  cancelledAt     DateTime?
+  cancelReason    String?
+  cancelledById   String?
+  cancelledBy     User?     @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  createdById String
+  createdBy   User   @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  /// الفهارس مبنية على أنماط الاستعلام الفعلية للشاشة: نطاق تاريخ + فرع + فئة،
+  /// والفرز الافتراضي على expenseDate. لا فهارس تخمينية.
+  @@index([expenseDate])
+  @@index([branchId, expenseDate])
+  @@index([category])
+  @@index([status])
+  @@map("expenses")
 }

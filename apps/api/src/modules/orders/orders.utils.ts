@@ -153,6 +153,14 @@ export function buildOrderWhere(query: ListOrdersQuery): Prisma.OrderWhereInput 
     };
   }
 
+  // نطاق الاستحقاق — يُسند شاشة التسليمات بتصفية على الخادم بدل جلب كل الطلبات
+  if (query.dueFrom !== undefined || query.dueTo !== undefined) {
+    where.dueDate = {
+      ...(query.dueFrom !== undefined ? { gte: query.dueFrom } : {}),
+      ...(query.dueTo !== undefined ? { lte: query.dueTo } : {}),
+    };
+  }
+
   return where;
 }
 

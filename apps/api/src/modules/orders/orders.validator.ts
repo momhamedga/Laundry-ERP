@@ -109,6 +109,18 @@ export const listOrdersQuerySchema = z.object({
   branchId: z.string().trim().min(1).optional(),
   receivedFrom: z.coerce.date().optional(),
   receivedTo: z.coerce.date().optional(),
+  /**
+   * نطاق تاريخ التسليم المستحقّ.
+   *
+   * dueDate كان قابلاً للفرز وغير قابل للتصفية، والفلتر الزمني الوحيد على
+   * receivedAt. فشاشة «تسليمات اليوم» — وهي سؤالٌ عن dueDate لا عن receivedAt —
+   * كانت تستلزم جلب كل الطلبات وتصفيتها في المتصفّح: تكلفةٌ تنمو مع كل طلب
+   * يُنشأ، وتصير غير محتملة في مغسلة بآلاف الطلبات.
+   *
+   * إضافة محضة على مسار قائم: غياب المعاملين يُبقي السلوك كما هو حرفياً.
+   */
+  dueFrom: z.coerce.date().optional(),
+  dueTo: z.coerce.date().optional(),
   sortBy: z.enum(ORDER_SORTABLE_FIELDS).default("receivedAt"),
   sortOrder: z.enum(SORT_ORDERS).default("desc"),
 });

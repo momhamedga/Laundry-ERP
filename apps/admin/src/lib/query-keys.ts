@@ -3,6 +3,7 @@ import type { ListBranchesParams } from "@/types/branch";
 import type { ListInvoicePaymentsParams, ListInvoicesParams } from "@/types/invoice";
 import type { ListNotificationsParams } from "@/types/notification";
 import type { BackupHistoryParams } from "@/types/backup";
+import type { ListExpensesParams, OperatingSummaryParams } from "@/types/expenses";
 import type {
   ListItemsParams,
   ListMovementsParams,
@@ -102,6 +103,13 @@ export const purchaseKeys = {
   all: ["purchases"] as const,
   list: (params: ListPurchasesParams) => [...purchaseKeys.all, "list", params] as const,
   detail: (id: string) => [...purchaseKeys.all, "detail", id] as const,
+};
+
+export const expenseKeys = {
+  all: ["expenses"] as const,
+  list: (params: ListExpensesParams) => [...expenseKeys.all, "list", params] as const,
+  detail: (id: string) => [...expenseKeys.all, "detail", id] as const,
+  summary: (params: OperatingSummaryParams) => [...expenseKeys.all, "summary", params] as const,
 };
 
 /** الولاء/الكوبونات/العضوية (Phase 9) */

@@ -12,6 +12,7 @@ import {
   Gift,
   IdCard,
   QrCode,
+  Receipt,
   ShieldCheck,
   Star,
   LayoutDashboard,
@@ -23,6 +24,7 @@ import {
   Truck,
   UserCog,
   Users,
+  PackageCheck,
 } from "lucide-react";
 import type { Permission } from "@/constants/permissions";
 import type { NavItem as BaseNavItem } from "@/types";
@@ -53,8 +55,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { title: "العملاء", href: "/customers", icon: Users, permission: "customers:read" },
       { title: "الخدمات", href: "/services", icon: Sparkles, permission: "services:read" },
       { title: "الطلبات", href: "/orders", icon: ShoppingCart, permission: "orders:read" },
+      // مباشرةً بعد الطلبات: قائمة اليوم التشغيلية، وأوّل ما يُفتح كل صباح
+      { title: "تسليمات اليوم", href: "/deliveries", icon: PackageCheck, permission: "orders:read" },
       { title: "المدفوعات", href: "/payments", icon: CreditCard, permission: "payments:read" },
       { title: "الفواتير", href: "/invoices", icon: FileText, permission: "invoices:read" },
+      // بعد المدفوعات مباشرةً: الوجه المقابل لها في الحركة المالية اليومية
+      { title: "المصروفات", href: "/expenses", icon: Receipt, permission: "expense:view" },
       { title: "إغلاق اليوم", href: "/day-closing", icon: CalendarCheck, permission: "day:view" },
     ],
   },

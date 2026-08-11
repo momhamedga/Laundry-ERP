@@ -55,6 +55,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
   // — يعتمد على المستخدم —
   { model: "AuditLog", delegate: "auditLog", key: "auditLogs" },
   { model: "EmployeeProfile", delegate: "employeeProfile", key: "employeeProfiles" },
+  { model: "Expense", delegate: "expense", key: "expenses" },
   { model: "LabelTemplate", delegate: "labelTemplate", key: "labelTemplates" },
   { model: "Notification", delegate: "notification", key: "notifications" },
   { model: "NotificationPreference", delegate: "notificationPreference", key: "notificationPreferences" },
